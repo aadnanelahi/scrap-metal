@@ -1748,6 +1748,7 @@ async def sales_register(
         }
     }
 
+@api_router.get("/reports/vat")
 @api_router.get("/reports/vat-report")
 async def vat_report(
     start_date: Optional[str] = None,
