@@ -8,7 +8,7 @@ import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, Trash2, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Loader2, Save, AlertCircle } from 'lucide-react';
 
 export default function NewLocalPurchasePage() {
   const navigate = useNavigate();
@@ -50,18 +50,18 @@ export default function NewLocalPurchasePage() {
         vatCodesAPI.list(),
         brokersAPI.list()
       ]);
-      setCompanies(compRes.data);
-      setBranches(branchRes.data);
-      setSuppliers(suppRes.data);
-      setItems(itemRes.data);
-      setVatCodes(vatRes.data);
-      setBrokers(brokerRes.data);
+      setCompanies(compRes.data || []);
+      setBranches(branchRes.data || []);
+      setSuppliers(suppRes.data || []);
+      setItems(itemRes.data || []);
+      setVatCodes(vatRes.data || []);
+      setBrokers(brokerRes.data || []);
 
       // Set defaults
-      if (compRes.data.length > 0) {
+      if (compRes.data && compRes.data.length > 0) {
         setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
       }
-      if (branchRes.data.length > 0) {
+      if (branchRes.data && branchRes.data.length > 0) {
         setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
       }
     } catch (error) {
@@ -178,6 +178,55 @@ export default function NewLocalPurchasePage() {
     );
   }
 
+  // Check if master data is available
+  const missingData = [];
+  if (companies.length === 0) missingData.push('Companies');
+  if (branches.length === 0) missingData.push('Branches');
+  if (suppliers.length === 0) missingData.push('Suppliers (Local)');
+  if (items.length === 0) missingData.push('Scrap Items');
+  if (vatCodes.length === 0) missingData.push('VAT Codes');
+
+  if (missingData.length > 0) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/local-purchases')}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">
+              New Local Purchase Order
+            </h1>
+          </div>
+        </div>
+        <div className="kpi-card border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-amber-800 dark:text-amber-300">Master Data Required</h3>
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                Before creating a purchase order, you need to set up the following master data:
+              </p>
+              <ul className="mt-2 space-y-1 text-sm text-amber-700 dark:text-amber-400">
+                {missingData.map(item => (
+                  <li key={item}>• {item}</li>
+                ))}
+              </ul>
+              <div className="mt-4 flex gap-2">
+                <Button onClick={() => navigate('/')} variant="outline" size="sm">
+                  Go to Dashboard & Load Sample Data
+                </Button>
+                <Button onClick={() => navigate('/companies')} variant="outline" size="sm">
+                  Create Company
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 animate-fade-in" data-testid="new-local-purchase-page">
       <div className="flex items-center gap-4">
@@ -269,14 +318,14 @@ export default function NewLocalPurchasePage() {
               <div>
                 <Label className="form-label">Broker</Label>
                 <Select
-                  value={formData.broker_id}
-                  onValueChange={(value) => setFormData({ ...formData, broker_id: value })}
+                  value={formData.broker_id || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, broker_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger className="form-input" data-testid="lpo-broker-select">
                     <SelectValue placeholder="Select broker" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {brokers.map((b) => (
                       <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                     ))}
@@ -336,13 +385,14 @@ export default function NewLocalPurchasePage() {
                     <div className="col-span-3">
                       <Label className="form-label text-xs">Item</Label>
                       <Select
-                        value={line.item_id}
-                        onValueChange={(value) => updateLine(index, 'item_id', value)}
+                        value={line.item_id || "select"}
+                        onValueChange={(value) => updateLine(index, 'item_id', value === "select" ? "" : value)}
                       >
                         <SelectTrigger className="form-input h-9" data-testid={`lpo-line-item-${index}`}>
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="select" disabled>Select Item</SelectItem>
                           {items.map((i) => (
                             <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                           ))}
@@ -374,13 +424,14 @@ export default function NewLocalPurchasePage() {
                     <div className="col-span-2">
                       <Label className="form-label text-xs">VAT Code</Label>
                       <Select
-                        value={line.vat_code_id}
-                        onValueChange={(value) => updateLine(index, 'vat_code_id', value)}
+                        value={line.vat_code_id || "select"}
+                        onValueChange={(value) => updateLine(index, 'vat_code_id', value === "select" ? "" : value)}
                       >
                         <SelectTrigger className="form-input h-9">
                           <SelectValue placeholder="Select" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="select" disabled>Select VAT</SelectItem>
                           {vatCodes.map((v) => (
                             <SelectItem key={v.id} value={v.id}>{v.name} ({v.rate}%)</SelectItem>
                           ))}
