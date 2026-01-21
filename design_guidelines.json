@@ -1,0 +1,150 @@
+{
+  "identity": {
+    "name": "ScrapOS",
+    "tagline": "Commercial Grade Scrap Metal ERP",
+    "aesthetic": "Industrial Tactical",
+    "description": "A high-density, high-contrast ERP designed for the rugged environment of scrap metal trading. It prioritizes data density, readability under harsh lighting, and speed of entry."
+  },
+  "typography": {
+    "primary_font": "Manrope",
+    "secondary_font": "Inter",
+    "mono_font": "JetBrains Mono",
+    "usage": {
+      "headings": "font-manrope font-bold tracking-tight text-slate-900 dark:text-slate-50",
+      "body": "font-inter text-slate-600 dark:text-slate-400",
+      "data_numbers": "font-mono font-medium tracking-tight",
+      "labels": "font-manrope text-xs uppercase tracking-wider font-semibold text-slate-500"
+    }
+  },
+  "colors": {
+    "palette": {
+      "primary": {
+        "DEFAULT": "#0f172a",
+        "foreground": "#f8fafc",
+        "description": "Slate-900. Used for Sidebar, Primary Actions, Headings."
+      },
+      "secondary": {
+        "DEFAULT": "#f1f5f9",
+        "foreground": "#0f172a",
+        "description": "Slate-100. Used for secondary buttons, backgrounds."
+      },
+      "accent": {
+        "DEFAULT": "#f97316",
+        "foreground": "#ffffff",
+        "description": "Orange-500. Safety Orange. Used for CTAs, Alerts, Critical Statuses."
+      },
+      "background": {
+        "light": "#ffffff",
+        "dark": "#020617"
+      },
+      "surface": {
+        "light": "#f8fafc",
+        "dark": "#0f172a"
+      },
+      "border": {
+        "light": "#e2e8f0",
+        "dark": "#1e293b"
+      }
+    },
+    "semantic": {
+      "success": "#10b981",
+      "warning": "#f59e0b",
+      "error": "#ef4444",
+      "info": "#3b82f6",
+      "weighbridge_display": "#fbbf24"
+    }
+  },
+  "layout": {
+    "spacing_scale": "Generous but dense where needed. Use p-6 for containers, but p-2 for data table cells.",
+    "grid_system": "Bento Grid Mode B (High Density)",
+    "sidebar": {
+      "width": "w-64",
+      "behavior": "Fixed left, dark theme always (Slate-900) to anchor the app.",
+      "collapsed_width": "w-16"
+    },
+    "container": {
+      "max_width": "max-w-[1600px]",
+      "padding": "px-4 md:px-8 py-6"
+    }
+  },
+  "components": {
+    "buttons": {
+      "style": "Rectangular, no rounded corners or very subtle rounded-sm. Uppercase text for primary actions.",
+      "primary": "bg-slate-900 text-white hover:bg-slate-800 shadow-sm",
+      "accent": "bg-orange-500 text-white hover:bg-orange-600 shadow-md",
+      "ghost": "hover:bg-slate-100 text-slate-700"
+    },
+    "cards": {
+      "style": "Flat, 1px border (Slate-200), no shadow or very subtle shadow-sm. White background.",
+      "header": "border-b border-slate-100 p-4",
+      "content": "p-4"
+    },
+    "inputs": {
+      "style": "h-10 rounded-sm border-slate-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 bg-white",
+      "label_position": "Top aligned, text-xs font-bold uppercase text-slate-500 mb-1.5"
+    },
+    "tables": {
+      "style": "Dense, border-collapse. Header: bg-slate-50 text-xs uppercase text-slate-500 font-bold. Row: hover:bg-slate-50/50 border-b border-slate-100.",
+      "cell_padding": "px-4 py-2.5"
+    },
+    "status_badges": {
+      "style": "rounded-full px-2.5 py-0.5 text-xs font-medium border",
+      "variants": {
+        "active": "bg-emerald-50 text-emerald-700 border-emerald-200",
+        "pending": "bg-amber-50 text-amber-700 border-amber-200",
+        "rejected": "bg-red-50 text-red-700 border-red-200"
+      }
+    }
+  },
+  "visual_enhancers": {
+    "textures": "Subtle noise texture on the sidebar background to give it a 'cast iron' feel.",
+    "borders": "Use 'Grid Borders' strategy. Visible separators between dashboard widgets.",
+    "shadows": "Minimal. Use borders to define hierarchy instead of drop shadows.",
+    "icons": "Lucide React. Stroke width 1.5px for elegance, 2px for active states."
+  },
+  "images": {
+    "login_background": {
+      "url": "https://images.unsplash.com/photo-1722695694560-f452b0919d3a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHw0fHxpbmR1c3RyaWFsJTIwc2NyYXAlMjBtZXRhbCUyMHlhcmQlMjByZWN5Y2xpbmclMjBwbGFudCUyMHN0ZWVsJTIwc2hpcHBpbmclMjBwb3J0fGVufDB8fHx8MTc2OTAxNTc1Nnww&ixlib=rb-4.1.0&q=85",
+      "alt": "Excavator in scrap yard",
+      "usage": "Full height on left side of login screen (50% width)."
+    },
+    "placeholder_logo": {
+      "url": "https://via.placeholder.com/150x50?text=ScrapOS",
+      "alt": "ScrapOS Logo"
+    }
+  },
+  "motion": {
+    "reduced_motion": "Respect prefers-reduced-motion",
+    "transitions": "transition-colors duration-200 ease-in-out",
+    "page_transition": "opacity-0 to opacity-100 duration-300"
+  },
+  "accessibility": {
+    "contrast": "Ensure 4.5:1 for normal text. Use Slate-600+ on white.",
+    "focus_states": "Visible orange ring offset-2 on all interactive elements.",
+    "aria": "All icons must have aria-hidden or aria-label. Tables must have captions."
+  },
+  "instructions_to_main_agent": {
+    "general": "Do not build a generic SaaS. Build a tool. Think 'Bloomberg Terminal meets Construction Site'. Dense, fast, reliable.",
+    "dashboard": "Use the Bento Grid Mode B. Top row: 4 key metrics (Tonnage, Cash, Pending POs, Trucks in Yard). Middle: Main Chart (Tonnage vs Price). Right: Recent Activity Feed.",
+    "weighbridge": "Create a dedicated 'Kiosk Mode' view. Huge inputs for Weight. High contrast (Black on Yellow) for the weight display.",
+    "tables": "Implement server-side pagination and filtering UI immediately. These tables will hold thousands of records.",
+    "forms": "Group fields logically using Fieldsets with Legend styling (uppercase, bold, border-bottom).",
+    "mobile": "Hide the sidebar behind a hamburger menu. Stack the bento grid to single column."
+  },
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) sparingly, mainly for sticky headers.",
+    "You MUST NOT apply universal transition. Eg: transition: all. This results in breaking transforms.",
+    "You MUST NOT center align the app container.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Components MUST use named exports",
+    "Pages MUST use default exports",
+    "Use sonner for toasts"
+  ]
+}
