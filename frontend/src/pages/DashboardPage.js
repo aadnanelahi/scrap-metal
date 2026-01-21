@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { dashboardAPI, seedDataAPI, inventoryAPI } from '../../lib/api';
-import { formatCurrency, formatNumber } from '../../lib/utils';
-import { Button } from '../../components/ui/button';
+import { dashboardAPI, seedDataAPI, inventoryAPI } from '../lib/api';
+import { formatCurrency, formatNumber } from '../lib/utils';
+import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import {
   TrendingUp,
