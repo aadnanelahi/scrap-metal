@@ -1880,6 +1880,393 @@ async def broker_commission_report(
         "total": total_commission
     }
 
+# ==================== CUSTOMER/SUPPLIER LEDGER ====================
+@api_router.get("/reports/customer-ledger/{customer_id}")
+async def customer_ledger(
+    customer_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    customer = await db.customers.find_one({"id": customer_id}, {"_id": 0})
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    
+    entries = []
+    running_balance = 0
+    
+    # Get all sales (debits to customer)
+    sales_filters = {"customer_id": customer_id, "status": "posted"}
+    if start_date:
+        sales_filters['order_date'] = {"$gte": start_date}
+    if end_date:
+        if 'order_date' in sales_filters:
+            sales_filters['order_date']['$lte'] = end_date
+        else:
+            sales_filters['order_date'] = {"$lte": end_date}
+    
+    local_sales = await db.local_sales.find(sales_filters, {"_id": 0}).to_list(1000)
+    for sale in local_sales:
+        running_balance += sale.get('total_amount', 0)
+        entries.append({
+            "date": sale.get('order_date'),
+            "type": "Invoice",
+            "reference": sale.get('order_number'),
+            "description": f"Local Sale - {sale.get('order_number')}",
+            "debit": sale.get('total_amount', 0),
+            "credit": 0,
+            "balance": running_balance
+        })
+    
+    # Get all payments received
+    payments = await db.payments.find({
+        "party_type": "customer",
+        "party_id": customer_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    for payment in payments:
+        running_balance -= payment.get('amount', 0)
+        entries.append({
+            "date": payment.get('payment_date'),
+            "type": "Receipt",
+            "reference": payment.get('receipt_number'),
+            "description": payment.get('notes') or f"Payment Received",
+            "debit": 0,
+            "credit": payment.get('amount', 0),
+            "balance": running_balance
+        })
+    
+    # Sort by date
+    entries.sort(key=lambda x: x['date'] or '')
+    
+    # Recalculate running balance
+    running = 0
+    for entry in entries:
+        running += entry['debit'] - entry['credit']
+        entry['balance'] = running
+    
+    total_debit = sum(e['debit'] for e in entries)
+    total_credit = sum(e['credit'] for e in entries)
+    
+    return {
+        "customer_name": customer.get('name'),
+        "opening_balance": 0,
+        "entries": entries,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "closing_balance": total_debit - total_credit
+    }
+
+@api_router.get("/reports/supplier-ledger/{supplier_id}")
+async def supplier_ledger(
+    supplier_id: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    supplier = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
+    if not supplier:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+    
+    entries = []
+    running_balance = 0
+    
+    # Get all purchases (credits - we owe supplier)
+    purchase_filters = {"supplier_id": supplier_id, "status": "posted"}
+    if start_date:
+        purchase_filters['order_date'] = {"$gte": start_date}
+    if end_date:
+        if 'order_date' in purchase_filters:
+            purchase_filters['order_date']['$lte'] = end_date
+        else:
+            purchase_filters['order_date'] = {"$lte": end_date}
+    
+    local_purchases = await db.local_purchases.find(purchase_filters, {"_id": 0}).to_list(1000)
+    for purchase in local_purchases:
+        running_balance += purchase.get('total_amount', 0)
+        entries.append({
+            "date": purchase.get('order_date'),
+            "type": "Bill",
+            "reference": purchase.get('order_number'),
+            "description": f"Local Purchase - {purchase.get('order_number')}",
+            "debit": 0,
+            "credit": purchase.get('total_amount', 0),
+            "balance": running_balance
+        })
+    
+    # Get all payments made
+    payments = await db.payments.find({
+        "party_type": "supplier",
+        "party_id": supplier_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    for payment in payments:
+        running_balance -= payment.get('amount', 0)
+        entries.append({
+            "date": payment.get('payment_date'),
+            "type": "Payment",
+            "reference": payment.get('receipt_number'),
+            "description": payment.get('notes') or f"Payment Made",
+            "debit": payment.get('amount', 0),
+            "credit": 0,
+            "balance": running_balance
+        })
+    
+    # Sort by date
+    entries.sort(key=lambda x: x['date'] or '')
+    
+    # Recalculate running balance
+    running = 0
+    for entry in entries:
+        running += entry['credit'] - entry['debit']
+        entry['balance'] = running
+    
+    total_debit = sum(e['debit'] for e in entries)
+    total_credit = sum(e['credit'] for e in entries)
+    
+    return {
+        "supplier_name": supplier.get('name'),
+        "opening_balance": 0,
+        "entries": entries,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "closing_balance": total_credit - total_debit
+    }
+
+# ==================== PAYMENTS ====================
+@api_router.get("/payments", response_model=List[Dict])
+async def list_payments(
+    party_type: Optional[str] = None,
+    party_id: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    filters = {"is_active": True}
+    if party_type:
+        filters['party_type'] = party_type
+    if party_id:
+        filters['party_id'] = party_id
+    return await crud_list("payments", filters)
+
+@api_router.get("/payments/{payment_id}")
+async def get_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
+    return await crud_get("payments", payment_id)
+
+@api_router.post("/payments")
+async def create_payment(data: Dict, current_user: Dict = Depends(get_current_user)):
+    payment_id = str(uuid.uuid4())
+    
+    # Generate receipt number
+    receipt_type = "RV" if data.get('type') == 'received' else "PV"
+    receipt_number = await generate_number(receipt_type, "payments")
+    
+    payment = {
+        "id": payment_id,
+        "receipt_number": receipt_number,
+        "type": data.get('type', 'received'),  # received (from customer) or paid (to supplier)
+        "party_type": data.get('party_type'),  # customer or supplier
+        "party_id": data.get('party_id'),
+        "party_name": data.get('party_name'),
+        "payment_date": data.get('payment_date'),
+        "amount": data.get('amount', 0),
+        "currency": data.get('currency', 'AED'),
+        "payment_method": data.get('payment_method', 'cash'),
+        "reference_number": data.get('reference_number'),
+        "document_number": data.get('document_number'),
+        "notes": data.get('notes'),
+        "status": "draft",
+        "is_active": True,
+        "created_by": current_user['id'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.payments.insert_one(payment)
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'payment', payment_id)
+    return {k: v for k, v in payment.items() if k != '_id'}
+
+@api_router.post("/payments/{payment_id}/post")
+async def post_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment.get('status') == 'posted':
+        raise HTTPException(status_code=400, detail="Already posted")
+    
+    # Create journal entry for payment
+    je_id = str(uuid.uuid4())
+    je_number = await generate_number("JE", "journal_entries")
+    
+    if payment.get('type') == 'received':
+        # Received from customer: Dr Cash, Cr Accounts Receivable
+        entries = [
+            {"account_code": "1000", "account_name": "Cash", "debit": payment['amount'], "credit": 0},
+            {"account_code": "1100", "account_name": "Accounts Receivable", "debit": 0, "credit": payment['amount']}
+        ]
+    else:
+        # Paid to supplier: Dr Accounts Payable, Cr Cash
+        entries = [
+            {"account_code": "2000", "account_name": "Accounts Payable", "debit": payment['amount'], "credit": 0},
+            {"account_code": "1000", "account_name": "Cash", "debit": 0, "credit": payment['amount']}
+        ]
+    
+    je = {
+        "id": je_id,
+        "entry_number": je_number,
+        "entry_date": payment['payment_date'],
+        "reference_type": "payment",
+        "reference_id": payment_id,
+        "description": f"Payment {'received from' if payment['type'] == 'received' else 'made to'} {payment.get('party_name', 'N/A')}",
+        "entries": entries,
+        "total_debit": payment['amount'],
+        "total_credit": payment['amount'],
+        "created_by": current_user['id'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.journal_entries.insert_one(je)
+    
+    await db.payments.update_one(
+        {"id": payment_id},
+        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'POST', 'payment', payment_id)
+    return {"message": "Payment posted"}
+
+# ==================== DOCUMENT CANCELLATION ====================
+@api_router.post("/local-purchases/{po_id}/cancel")
+async def cancel_local_purchase(po_id: str, reason: str = Query(...), current_user: Dict = Depends(get_current_user)):
+    po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    if po.get('status') == 'posted':
+        # Reverse inventory movements
+        for line in po.get('lines', []):
+            stock = await db.inventory_stock.find_one({
+                "item_id": line['item_id'],
+                "branch_id": po['branch_id']
+            }, {"_id": 0})
+            
+            avg_cost = stock.get('avg_cost', 0) if stock else line.get('unit_price', 0)
+            await update_inventory(
+                item_id=line['item_id'],
+                item_name=line['item_name'],
+                branch_id=po['branch_id'],
+                quantity=-line['quantity'],  # Reverse
+                unit_cost=avg_cost,
+                movement_type='OUT',
+                reference_type='local_purchase_cancel',
+                reference_id=po_id,
+                reference_number=f"CANCEL-{po['order_number']}"
+            )
+        
+        # Create reversal journal entry
+        je_id = str(uuid.uuid4())
+        je_number = await generate_number("JE", "journal_entries")
+        
+        je = {
+            "id": je_id,
+            "entry_number": je_number,
+            "entry_date": datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+            "reference_type": "local_purchase_cancel",
+            "reference_id": po_id,
+            "description": f"Cancellation reversal for {po['order_number']} - {reason}",
+            "entries": [
+                {"account_code": "2000", "account_name": "Accounts Payable", "debit": po['total_amount'], "credit": 0},
+                {"account_code": "5000", "account_name": "Inventory", "debit": 0, "credit": po['subtotal']},
+                {"account_code": "1200", "account_name": "Input VAT", "debit": 0, "credit": po.get('vat_amount', 0)}
+            ],
+            "total_debit": po['total_amount'],
+            "total_credit": po['total_amount'],
+            "created_by": current_user['id'],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.journal_entries.insert_one(je)
+    
+    await db.local_purchases.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": reason,
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "cancelled_by": current_user['id']
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_purchase', po_id, {"reason": reason})
+    return {"message": "Purchase order cancelled"}
+
+@api_router.post("/local-sales/{so_id}/cancel")
+async def cancel_local_sale(so_id: str, reason: str = Query(...), current_user: Dict = Depends(get_current_user)):
+    so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
+    if not so:
+        raise HTTPException(status_code=404, detail="Sales order not found")
+    
+    if so.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    if so.get('status') == 'posted':
+        # Reverse inventory movements (add back stock)
+        for line in so.get('lines', []):
+            stock = await db.inventory_stock.find_one({
+                "item_id": line['item_id'],
+                "branch_id": so['branch_id']
+            }, {"_id": 0})
+            
+            avg_cost = stock.get('avg_cost', 0) if stock else line.get('unit_price', 0)
+            await update_inventory(
+                item_id=line['item_id'],
+                item_name=line['item_name'],
+                branch_id=so['branch_id'],
+                quantity=line['quantity'],  # Add back
+                unit_cost=avg_cost,
+                movement_type='IN',
+                reference_type='local_sale_cancel',
+                reference_id=so_id,
+                reference_number=f"CANCEL-{so['order_number']}"
+            )
+        
+        # Create reversal journal entry
+        je_id = str(uuid.uuid4())
+        je_number = await generate_number("JE", "journal_entries")
+        
+        je = {
+            "id": je_id,
+            "entry_number": je_number,
+            "entry_date": datetime.now(timezone.utc).strftime('%Y-%m-%d'),
+            "reference_type": "local_sale_cancel",
+            "reference_id": so_id,
+            "description": f"Cancellation reversal for {so['order_number']} - {reason}",
+            "entries": [
+                {"account_code": "4000", "account_name": "Sales Revenue", "debit": so['subtotal'], "credit": 0},
+                {"account_code": "2100", "account_name": "Output VAT", "debit": so.get('vat_amount', 0), "credit": 0},
+                {"account_code": "1100", "account_name": "Accounts Receivable", "debit": 0, "credit": so['total_amount']}
+            ],
+            "total_debit": so['total_amount'],
+            "total_credit": so['total_amount'],
+            "created_by": current_user['id'],
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.journal_entries.insert_one(je)
+    
+    await db.local_sales.update_one(
+        {"id": so_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": reason,
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+            "cancelled_by": current_user['id']
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_sale', so_id, {"reason": reason})
+    return {"message": "Sales order cancelled"}
+
 # ==================== SEED DATA ====================
 @api_router.post("/seed-data")
 async def seed_data(current_user: Dict = Depends(get_current_user)):
