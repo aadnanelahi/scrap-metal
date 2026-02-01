@@ -344,6 +344,17 @@ export default function WeighbridgePage() {
                   <td className="text-slate-500 text-sm">{formatDateTime(entry.created_at)}</td>
                   <td>
                     <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const html = generateWeighbridgeSlipHTML(entry);
+                          printDocument(html, `WB-${entry.slip_number}`);
+                        }}
+                        data-testid={`wb-print-btn-${entry.id}`}
+                      >
+                        <Printer className="w-4 h-4" />
+                      </Button>
                       {entry.status === 'first_weight' && !entry.is_locked && (
                         <Button
                           size="sm"
