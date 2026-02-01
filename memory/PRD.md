@@ -44,13 +44,13 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 
 ### ✅ Purchase Modules (Fully Segregated)
 - **Local Purchases**: PO creation, VAT calculation, broker commission, inventory update, accounting posting
-- **International Purchases**: Multi-currency, landed cost, no VAT
+- **International Purchases**: Multi-currency, landed cost, shipping details, incoterms ✨ NEW FORM
 - **Print Purchase Orders** ✨ NEW
 - **Purchase Order Detail View** ✨ NEW
 
 ### ✅ Sales Modules (Fully Segregated)
 - **Local Sales**: SO creation, VAT calculation, broker commission, inventory reduction, COGS calculation
-- **Export Sales**: Zero-rated VAT, incoterms, container details
+- **Export Sales**: Zero-rated VAT, incoterms, container details, multi-currency ✨ NEW FORM
 - **Print Sales Orders** ✨ NEW
 - **Sales Order Detail View** ✨ NEW
 
@@ -123,13 +123,14 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### P0 - Critical (Completed ✅)
 - [x] Fix transaction form crashes with empty data
 - [x] Add print functionality for documents
+- [x] International Purchase Order form (with landed cost)
+- [x] Export Sales Contract form (with zero-rated VAT)
 
 ### P1 - High Priority (Next Sprint)
 - [ ] PDF/Excel export for all reports
-- [ ] Complete International Purchase form UI
-- [ ] Complete Export Sales form UI
 - [ ] Payment Receipt printing
 - [ ] Weighbridge hardware API integration placeholder
+- [ ] Document cancellation/reversal flow
 
 ### P2 - Medium Priority
 - [ ] Document cancellation/reversal flow
