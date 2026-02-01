@@ -33,7 +33,9 @@ import {
   Globe,
   UserCircle,
   Menu,
-  X
+  X,
+  Database,
+  HardDrive
 } from 'lucide-react';
 
 const navItems = [
