@@ -64,6 +64,8 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Chart of Accounts (pre-seeded)
 - Automatic journal entry creation on posting
 - VAT Input/Output tracking
+- **Payments Page** ✨ NEW - Receipts from customers & payments to suppliers
+- **Payment Receipt Printing** ✨ NEW
 
 ### ✅ Reports
 - Purchase Register (Local & Intl separate)
@@ -71,6 +73,14 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - VAT Report (UAE FTA format)
 - Stock Aging
 - Broker Commission Report
+- **Customer Ledger** ✨ NEW
+- **Supplier Ledger** ✨ NEW
+- **PDF/Excel Export** ✨ NEW - All reports exportable
+
+### ✅ Document Management
+- **Document Cancellation** ✨ NEW - Cancel PO/SO with automatic reversal entries
+- Cancellation reason tracking
+- Audit trail for all cancellations
 
 ### ✅ Dashboard
 - KPIs: Total Purchases, Sales, Gross Margin, Inventory Value
