@@ -102,6 +102,7 @@ const navItems = [
       { title: 'VAT Report', path: '/reports/vat' },
       { title: 'Stock Aging', path: '/reports/stock-aging' },
       { title: 'Broker Commission', path: '/reports/broker-commission' },
+      { title: 'Party Ledger', path: '/reports/party-ledger' },
     ],
   },
   {
