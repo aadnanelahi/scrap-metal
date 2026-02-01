@@ -10,7 +10,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **Authentication**: JWT-based with bcrypt password hashing
 - **Theme**: Dark/Light mode with theme toggle
 
-## Implemented Features (v1.0) - January 2026
+## Implemented Features (v1.0) - February 2026
 
 ### ✅ Auth & Security
 - User registration with role selection
@@ -40,14 +40,19 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Weight slip number generation (WB-YYYYMM-XXXX)
 - Lock functionality after posting
 - Vehicle & driver tracking
+- **Print weighbridge slips** ✨ NEW
 
 ### ✅ Purchase Modules (Fully Segregated)
 - **Local Purchases**: PO creation, VAT calculation, broker commission, inventory update, accounting posting
 - **International Purchases**: Multi-currency, landed cost, no VAT
+- **Print Purchase Orders** ✨ NEW
+- **Purchase Order Detail View** ✨ NEW
 
 ### ✅ Sales Modules (Fully Segregated)
 - **Local Sales**: SO creation, VAT calculation, broker commission, inventory reduction, COGS calculation
 - **Export Sales**: Zero-rated VAT, incoterms, container details
+- **Print Sales Orders** ✨ NEW
+- **Sales Order Detail View** ✨ NEW
 
 ### ✅ Inventory Module
 - Real-time stock by Item & Yard
