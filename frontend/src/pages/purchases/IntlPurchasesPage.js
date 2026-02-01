@@ -44,7 +44,7 @@ export default function IntlPurchasesPage() {
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">International Purchases</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage international imports with landed costs</p>
         </div>
-        <Button className="btn-accent gap-2" data-testid="new-intl-purchase-btn" onClick={() => toast.info('Coming soon: International Purchase form')}>
+        <Button className="btn-accent gap-2" data-testid="new-intl-purchase-btn" onClick={() => navigate('/intl-purchases/new')}>
           <Plus className="w-4 h-4" />New Intl PO
         </Button>
       </div>

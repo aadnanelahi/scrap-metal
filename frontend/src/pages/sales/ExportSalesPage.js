@@ -43,7 +43,7 @@ export default function ExportSalesPage() {
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">Export Sales</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage export contracts (zero-rated VAT)</p>
         </div>
-        <Button className="btn-accent gap-2" data-testid="new-export-sale-btn" onClick={() => toast.info('Coming soon: Export Sales form')}>
+        <Button className="btn-accent gap-2" data-testid="new-export-sale-btn" onClick={() => navigate('/export-sales/new')}>
           <Plus className="w-4 h-4" />New Export Contract
         </Button>
       </div>
