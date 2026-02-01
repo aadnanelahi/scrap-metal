@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { localSalesAPI, customersAPI, branchesAPI, scrapItemsAPI, vatCodesAPI, brokersAPI, companiesAPI } from '../../lib/api';
-import { formatCurrency, formatDate, getStatusColor } from '../../lib/utils';
+import { formatCurrency, formatDate, getStatusColor, printDocument, generateSOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Check, Truck } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, Truck } from 'lucide-react';
 
 export default function LocalSalesPage() {
   const [sales, setSales] = useState([]);
@@ -105,8 +105,14 @@ export default function LocalSalesPage() {
                   </td>
                   <td>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/local-sales/${so.id}`)}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/local-sales/${so.id}`)} data-testid={`lso-view-btn-${so.id}`}>
                         <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        const html = generateSOPrintHTML(so);
+                        printDocument(html, `SO-${so.order_number}`);
+                      }} data-testid={`lso-print-btn-${so.id}`}>
+                        <Printer className="w-4 h-4" />
                       </Button>
                       {so.status !== 'posted' && so.status !== 'cancelled' && (
                         <Button

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { localPurchasesAPI, suppliersAPI, branchesAPI, scrapItemsAPI, vatCodesAPI, brokersAPI, companiesAPI } from '../../lib/api';
-import { formatCurrency, formatDate, getStatusColor } from '../../lib/utils';
+import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, FileText, Loader2, Check, ShoppingCart } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, ShoppingCart } from 'lucide-react';
 
 export default function LocalPurchasesPage() {
   const [purchases, setPurchases] = useState([]);
@@ -105,8 +105,14 @@ export default function LocalPurchasesPage() {
                   </td>
                   <td>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}`)}>
+                      <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}`)} data-testid={`lpo-view-btn-${po.id}`}>
                         <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        const html = generatePOPrintHTML(po);
+                        printDocument(html, `PO-${po.order_number}`);
+                      }} data-testid={`lpo-print-btn-${po.id}`}>
+                        <Printer className="w-4 h-4" />
                       </Button>
                       {po.status !== 'posted' && po.status !== 'cancelled' && (
                         <Button
