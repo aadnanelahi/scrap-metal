@@ -94,10 +94,10 @@ export default function BrokerCommissionPage() {
       <div className="kpi-card">
         <div className="flex gap-4 items-end">
           <div className="w-64">
-            <Select value={brokerId} onValueChange={setBrokerId}>
+            <Select value={brokerId || "all"} onValueChange={(v) => setBrokerId(v === "all" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="All Brokers" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Brokers</SelectItem>
+                <SelectItem value="all">All Brokers</SelectItem>
                 {brokers.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
               </SelectContent>
             </Select>
