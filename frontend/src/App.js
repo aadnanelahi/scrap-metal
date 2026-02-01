@@ -134,6 +134,7 @@ function AppRoutes() {
       {/* Finance */}
       <Route path="/accounts" element={<ProtectedRoute><AccountsPage /></ProtectedRoute>} />
       <Route path="/journal-entries" element={<ProtectedRoute><JournalEntriesPage /></ProtectedRoute>} />
+      <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
 
       {/* Reports */}
       <Route path="/reports/purchases" element={<ProtectedRoute><PurchaseRegisterPage /></ProtectedRoute>} />
