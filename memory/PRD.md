@@ -106,26 +106,40 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Multi-company & multi-branch ready
 - SaaS-ready tenant separation architecture
 
+## Recent Changes (February 2026)
+
+### Bug Fixes ✅
+- **P0 Fixed**: Transaction creation forms no longer crash when master data is empty
+- Forms now show helpful "Master Data Required" message instead of crashing
+- Weighbridge page handles empty branches/weighbridges gracefully
+
+### New Features ✅
+- **Document Printing**: Print functionality for all documents (PO, SO, Weighbridge Slips)
+- **Detail Pages**: View Purchase Order and Sales Order details with print option
+- **Print Templates**: Professional print layout with company header, signatures
+
 ## Prioritized Backlog
 
-### P0 - Critical (Next Sprint)
+### P0 - Critical (Completed ✅)
+- [x] Fix transaction form crashes with empty data
+- [x] Add print functionality for documents
+
+### P1 - High Priority (Next Sprint)
 - [ ] PDF/Excel export for all reports
 - [ ] Complete International Purchase form UI
 - [ ] Complete Export Sales form UI
-
-### P1 - High Priority
+- [ ] Payment Receipt printing
 - [ ] Weighbridge hardware API integration placeholder
+
+### P2 - Medium Priority
 - [ ] Document cancellation/reversal flow
 - [ ] Customer/Supplier ledger reports
 - [ ] Trial balance report
-
-### P2 - Medium Priority
 - [ ] Currency revaluation
-- [ ] Forex gain/loss calculation
-- [ ] Dashboard monthly charts with real data
-- [ ] Container/BL tracking for exports
 
 ### P3 - Low Priority
+- [ ] Dashboard monthly charts with real data
+- [ ] Container/BL tracking for exports
 - [ ] AI-powered insights (architecture ready)
 - [ ] Email notifications
 - [ ] Multi-tenant SaaS mode
