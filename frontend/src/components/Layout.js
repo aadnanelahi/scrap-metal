@@ -153,6 +153,11 @@ export const Layout = ({ children }) => {
     const isExpanded = expandedItems.includes(item.title);
     const active = item.path ? isActive(item.path) : isChildActive(item.children);
 
+    // Hide admin-only items for non-admin users
+    if (item.adminOnly && user?.role !== 'admin') {
+      return null;
+    }
+
     if (hasChildren) {
       return (
         <div>
