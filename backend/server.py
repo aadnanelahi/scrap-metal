@@ -2267,6 +2267,179 @@ async def cancel_local_sale(so_id: str, reason: str = Query(...), current_user: 
     await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_sale', so_id, {"reason": reason})
     return {"message": "Sales order cancelled"}
 
+# ==================== BACKUP, RESTORE & RESET ====================
+# All collections that need to be backed up
+BACKUP_COLLECTIONS = [
+    'users', 'companies', 'branches', 'customers', 'suppliers', 'brokers',
+    'scrap_categories', 'scrap_items', 'vat_codes', 'currencies', 'payment_terms',
+    'incoterms', 'ports', 'weighbridges', 'accounts',
+    'local_purchases', 'intl_purchases', 'local_sales', 'export_sales',
+    'weighbridge_entries', 'inventory_stock', 'inventory_movements',
+    'journal_entries', 'payments', 'audit_logs', 'number_sequences'
+]
+
+def require_admin(current_user: Dict):
+    """Helper to check admin role"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+@api_router.get("/admin/backup")
+async def create_backup(current_user: Dict = Depends(get_current_user)):
+    """Create a complete backup of all data"""
+    require_admin(current_user)
+    
+    backup_data = {
+        "metadata": {
+            "version": "1.0",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": current_user['email'],
+            "collections": BACKUP_COLLECTIONS
+        },
+        "data": {}
+    }
+    
+    for collection_name in BACKUP_COLLECTIONS:
+        collection = db[collection_name]
+        documents = await collection.find({}, {"_id": 0}).to_list(None)
+        backup_data["data"][collection_name] = documents
+    
+    await log_audit(current_user['id'], current_user['email'], 'BACKUP', 'system', None, {
+        "collections": BACKUP_COLLECTIONS,
+        "record_counts": {col: len(backup_data["data"].get(col, [])) for col in BACKUP_COLLECTIONS}
+    })
+    
+    return backup_data
+
+@api_router.post("/admin/restore")
+async def restore_backup(backup_data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Restore data from a backup file"""
+    require_admin(current_user)
+    
+    # Validate backup structure
+    if "metadata" not in backup_data or "data" not in backup_data:
+        raise HTTPException(status_code=400, detail="Invalid backup file format")
+    
+    if backup_data["metadata"].get("version") != "1.0":
+        raise HTTPException(status_code=400, detail="Unsupported backup version")
+    
+    restored_counts = {}
+    errors = []
+    
+    for collection_name, documents in backup_data["data"].items():
+        if collection_name not in BACKUP_COLLECTIONS:
+            continue
+        
+        try:
+            collection = db[collection_name]
+            
+            # Clear existing data
+            await collection.delete_many({})
+            
+            # Insert backup data
+            if documents and len(documents) > 0:
+                await collection.insert_many(documents)
+            
+            restored_counts[collection_name] = len(documents)
+        except Exception as e:
+            errors.append(f"{collection_name}: {str(e)}")
+    
+    await log_audit(current_user['id'], current_user['email'], 'RESTORE', 'system', None, {
+        "backup_date": backup_data["metadata"].get("created_at"),
+        "backup_by": backup_data["metadata"].get("created_by"),
+        "restored_counts": restored_counts,
+        "errors": errors
+    })
+    
+    if errors:
+        return {
+            "message": "Restore completed with errors",
+            "restored_counts": restored_counts,
+            "errors": errors
+        }
+    
+    return {
+        "message": "Restore completed successfully",
+        "restored_counts": restored_counts
+    }
+
+@api_router.post("/admin/reset")
+async def reset_all_data(
+    confirm: str = Query(..., description="Must be 'CONFIRM_RESET' to proceed"),
+    preserve_users: bool = Query(True, description="Keep user accounts"),
+    preserve_master_data: bool = Query(False, description="Keep master data (companies, branches, etc.)"),
+    current_user: Dict = Depends(get_current_user)
+):
+    """Reset all data - DESTRUCTIVE OPERATION"""
+    require_admin(current_user)
+    
+    if confirm != "CONFIRM_RESET":
+        raise HTTPException(status_code=400, detail="Must confirm reset with 'CONFIRM_RESET'")
+    
+    deleted_counts = {}
+    
+    # Collections that can be preserved
+    master_collections = ['companies', 'branches', 'customers', 'suppliers', 'brokers',
+                          'scrap_categories', 'scrap_items', 'vat_codes', 'currencies',
+                          'payment_terms', 'incoterms', 'ports', 'weighbridges', 'accounts']
+    
+    for collection_name in BACKUP_COLLECTIONS:
+        # Skip users if preserve_users is True
+        if preserve_users and collection_name == 'users':
+            continue
+        
+        # Skip master data if preserve_master_data is True
+        if preserve_master_data and collection_name in master_collections:
+            continue
+        
+        # Skip audit logs (always keep for compliance)
+        if collection_name == 'audit_logs':
+            continue
+        
+        try:
+            collection = db[collection_name]
+            result = await collection.delete_many({})
+            deleted_counts[collection_name] = result.deleted_count
+        except Exception as e:
+            deleted_counts[collection_name] = f"Error: {str(e)}"
+    
+    # Reset number sequences if not preserving master data
+    if not preserve_master_data:
+        await db.number_sequences.delete_many({})
+        deleted_counts['number_sequences'] = 'reset'
+    
+    await log_audit(current_user['id'], current_user['email'], 'RESET', 'system', None, {
+        "preserve_users": preserve_users,
+        "preserve_master_data": preserve_master_data,
+        "deleted_counts": deleted_counts
+    })
+    
+    return {
+        "message": "Data reset completed",
+        "deleted_counts": deleted_counts,
+        "preserved": {
+            "users": preserve_users,
+            "master_data": preserve_master_data,
+            "audit_logs": True
+        }
+    }
+
+@api_router.get("/admin/stats")
+async def get_system_stats(current_user: Dict = Depends(get_current_user)):
+    """Get statistics about all collections"""
+    require_admin(current_user)
+    
+    stats = {}
+    for collection_name in BACKUP_COLLECTIONS:
+        collection = db[collection_name]
+        count = await collection.count_documents({})
+        stats[collection_name] = count
+    
+    return {
+        "collections": stats,
+        "total_records": sum(stats.values()),
+        "generated_at": datetime.now(timezone.utc).isoformat()
+    }
+
 # ==================== SEED DATA ====================
 @api_router.post("/seed-data")
 async def seed_data(current_user: Dict = Depends(get_current_user)):
