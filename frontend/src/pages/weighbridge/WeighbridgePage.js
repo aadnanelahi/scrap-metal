@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { weighbridgeEntriesAPI, weighbridgesAPI, branchesAPI } from '../../lib/api';
-import { formatNumber, formatDateTime, getStatusColor } from '../../lib/utils';
+import { formatNumber, formatDateTime, getStatusColor, printDocument, generateWeighbridgeSlipHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Scale, Plus, Loader2, Check, Lock, Truck, AlertCircle } from 'lucide-react';
+import { Scale, Plus, Loader2, Check, Lock, Truck, AlertCircle, Printer } from 'lucide-react';
 
 export default function WeighbridgePage() {
   const [entries, setEntries] = useState([]);
