@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Scale, Plus, Loader2, Check, Lock, Truck } from 'lucide-react';
+import { Scale, Plus, Loader2, Check, Lock, Truck, AlertCircle } from 'lucide-react';
 
 export default function WeighbridgePage() {
   const [entries, setEntries] = useState([]);
@@ -40,9 +40,9 @@ export default function WeighbridgePage() {
         weighbridgesAPI.list(),
         branchesAPI.list()
       ]);
-      setEntries(entriesRes.data);
-      setWeighbridges(wbRes.data);
-      setBranches(branchRes.data);
+      setEntries(entriesRes.data || []);
+      setWeighbridges(wbRes.data || []);
+      setBranches(branchRes.data || []);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -145,17 +145,30 @@ export default function WeighbridgePage() {
               <DialogTitle className="font-manrope">New Weighbridge Entry</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
+              {(branches.length === 0 || weighbridges.length === 0) && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-sm p-4 mb-4">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="text-sm text-amber-700 dark:text-amber-400">
+                      <p className="font-medium">Missing Master Data</p>
+                      <p>Please set up {branches.length === 0 ? 'Branches' : ''}{branches.length === 0 && weighbridges.length === 0 ? ' and ' : ''}{weighbridges.length === 0 ? 'Weighbridges' : ''} first.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="form-label">Branch / Yard</Label>
                   <Select
-                    value={formData.branch_id}
-                    onValueChange={(value) => setFormData({ ...formData, branch_id: value })}
+                    value={formData.branch_id || "select"}
+                    onValueChange={(value) => setFormData({ ...formData, branch_id: value === "select" ? "" : value })}
+                    disabled={branches.length === 0}
                   >
                     <SelectTrigger className="form-input" data-testid="wb-branch-select">
-                      <SelectValue placeholder="Select branch" />
+                      <SelectValue placeholder={branches.length === 0 ? "No branches available" : "Select branch"} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="select" disabled>Select branch</SelectItem>
                       {branches.map((b) => (
                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                       ))}
@@ -165,13 +178,15 @@ export default function WeighbridgePage() {
                 <div>
                   <Label className="form-label">Weighbridge</Label>
                   <Select
-                    value={formData.weighbridge_id}
-                    onValueChange={(value) => setFormData({ ...formData, weighbridge_id: value })}
+                    value={formData.weighbridge_id || "select"}
+                    onValueChange={(value) => setFormData({ ...formData, weighbridge_id: value === "select" ? "" : value })}
+                    disabled={weighbridges.length === 0}
                   >
                     <SelectTrigger className="form-input" data-testid="wb-weighbridge-select">
-                      <SelectValue placeholder="Select weighbridge" />
+                      <SelectValue placeholder={weighbridges.length === 0 ? "No weighbridges available" : "Select weighbridge"} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="select" disabled>Select weighbridge</SelectItem>
                       {weighbridges.map((wb) => (
                         <SelectItem key={wb.id} value={wb.id}>{wb.name}</SelectItem>
                       ))}
