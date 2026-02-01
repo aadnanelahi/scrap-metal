@@ -142,6 +142,7 @@ function AppRoutes() {
       <Route path="/reports/vat" element={<ProtectedRoute><VATReportPage /></ProtectedRoute>} />
       <Route path="/reports/stock-aging" element={<ProtectedRoute><StockAgingPage /></ProtectedRoute>} />
       <Route path="/reports/broker-commission" element={<ProtectedRoute><BrokerCommissionPage /></ProtectedRoute>} />
+      <Route path="/reports/party-ledger" element={<ProtectedRoute><PartyLedgerPage /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
