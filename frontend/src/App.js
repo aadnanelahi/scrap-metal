@@ -51,6 +51,7 @@ import SalesRegisterPage from './pages/reports/SalesRegisterPage';
 import VATReportPage from './pages/reports/VATReportPage';
 import StockAgingPage from './pages/reports/StockAgingPage';
 import BrokerCommissionPage from './pages/reports/BrokerCommissionPage';
+import PartyLedgerPage from './pages/reports/PartyLedgerPage';
 
 // Admin
 import UsersPage from './pages/users/UsersPage';
