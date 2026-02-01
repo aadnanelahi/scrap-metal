@@ -43,6 +43,7 @@ import WeighbridgesMasterPage from './pages/master/WeighbridgesMasterPage';
 // Finance
 import AccountsPage from './pages/finance/AccountsPage';
 import JournalEntriesPage from './pages/finance/JournalEntriesPage';
+import PaymentsPage from './pages/finance/PaymentsPage';
 
 // Reports
 import PurchaseRegisterPage from './pages/reports/PurchaseRegisterPage';
