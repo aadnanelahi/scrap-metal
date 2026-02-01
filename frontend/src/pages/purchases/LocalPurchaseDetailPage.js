@@ -109,8 +109,44 @@ export default function LocalPurchaseDetailPage() {
               Post
             </Button>
           )}
+          {po.status !== 'cancelled' && (
+            <Button variant="outline" onClick={() => setShowCancelDialog(true)} className="gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" data-testid="cancel-po-btn">
+              <XCircle className="w-4 h-4" />
+              Cancel
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Cancel Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Purchase Order</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Label className="form-label">Cancellation Reason</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Please provide a reason for cancellation..."
+              className="form-input"
+              rows={3}
+            />
+            {po.status === 'posted' && (
+              <p className="text-sm text-amber-600 mt-2">
+                This document has been posted. Cancellation will create reversal entries.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>Cancel</Button>
+            <Button onClick={handleCancel} disabled={cancelling} className="bg-red-600 hover:bg-red-700">
+              {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm Cancellation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
