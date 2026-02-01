@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Plus, Eye, Loader2, Check, Globe } from 'lucide-react';
 
 export default function ExportSalesPage() {
+  const navigate = useNavigate();
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
 
