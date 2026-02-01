@@ -19,12 +19,14 @@ import LocalPurchasesPage from './pages/purchases/LocalPurchasesPage';
 import NewLocalPurchasePage from './pages/purchases/NewLocalPurchasePage';
 import LocalPurchaseDetailPage from './pages/purchases/LocalPurchaseDetailPage';
 import IntlPurchasesPage from './pages/purchases/IntlPurchasesPage';
+import NewIntlPurchasePage from './pages/purchases/NewIntlPurchasePage';
 
 // Sales
 import LocalSalesPage from './pages/sales/LocalSalesPage';
 import NewLocalSalePage from './pages/sales/NewLocalSalePage';
 import LocalSaleDetailPage from './pages/sales/LocalSaleDetailPage';
 import ExportSalesPage from './pages/sales/ExportSalesPage';
+import NewExportSalePage from './pages/sales/NewExportSalePage';
 
 // Master Data
 import CompaniesPage from './pages/master/CompaniesPage';
@@ -106,12 +108,14 @@ function AppRoutes() {
       <Route path="/local-purchases/new" element={<ProtectedRoute><NewLocalPurchasePage /></ProtectedRoute>} />
       <Route path="/local-purchases/:id" element={<ProtectedRoute><LocalPurchaseDetailPage /></ProtectedRoute>} />
       <Route path="/intl-purchases" element={<ProtectedRoute><IntlPurchasesPage /></ProtectedRoute>} />
+      <Route path="/intl-purchases/new" element={<ProtectedRoute><NewIntlPurchasePage /></ProtectedRoute>} />
 
       {/* Sales */}
       <Route path="/local-sales" element={<ProtectedRoute><LocalSalesPage /></ProtectedRoute>} />
       <Route path="/local-sales/new" element={<ProtectedRoute><NewLocalSalePage /></ProtectedRoute>} />
       <Route path="/local-sales/:id" element={<ProtectedRoute><LocalSaleDetailPage /></ProtectedRoute>} />
       <Route path="/export-sales" element={<ProtectedRoute><ExportSalesPage /></ProtectedRoute>} />
+      <Route path="/export-sales/new" element={<ProtectedRoute><NewExportSalePage /></ProtectedRoute>} />
 
       {/* Master Data */}
       <Route path="/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
