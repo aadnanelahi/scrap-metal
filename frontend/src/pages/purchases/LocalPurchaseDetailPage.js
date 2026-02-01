@@ -4,8 +4,11 @@ import { localPurchasesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Textarea } from '../../components/ui/textarea';
+import { Label } from '../../components/ui/label';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Check, Loader2, XCircle } from 'lucide-react';
 
 export default function LocalPurchaseDetailPage() {
   const { id } = useParams();
@@ -13,6 +16,9 @@ export default function LocalPurchaseDetailPage() {
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     loadPO();
@@ -40,6 +46,24 @@ export default function LocalPurchaseDetailPage() {
       toast.error(error.response?.data?.detail || 'Failed to post');
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!cancelReason.trim()) {
+      toast.error('Please provide a cancellation reason');
+      return;
+    }
+    setCancelling(true);
+    try {
+      await localPurchasesAPI.cancel(id, cancelReason);
+      toast.success('Purchase order cancelled');
+      setShowCancelDialog(false);
+      loadPO();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to cancel');
+    } finally {
+      setCancelling(false);
     }
   };
 
