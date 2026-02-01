@@ -122,11 +122,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **P0 Fixed**: Transaction creation forms no longer crash when master data is empty
 - Forms now show helpful "Master Data Required" message instead of crashing
 - Weighbridge page handles empty branches/weighbridges gracefully
+- Fixed Broker Commission SelectItem empty value bug
 
 ### New Features ✅
 - **Document Printing**: Print functionality for all documents (PO, SO, Weighbridge Slips)
 - **Detail Pages**: View Purchase Order and Sales Order details with print option
 - **Print Templates**: Professional print layout with company header, signatures
+- **PDF/Excel Export**: All reports exportable to PDF and Excel ✨
+- **Payments Page**: Receipts & Payment Vouchers with print ✨
+- **Party Ledger**: Customer & Supplier account statements ✨
+- **Document Cancellation**: Cancel PO/SO with reversal entries ✨
 
 ## Prioritized Backlog
 
@@ -135,18 +140,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] Add print functionality for documents
 - [x] International Purchase Order form (with landed cost)
 - [x] Export Sales Contract form (with zero-rated VAT)
+- [x] PDF/Excel export for all reports
+- [x] Payment Receipt printing
+- [x] Customer/Supplier ledger reports
+- [x] Document cancellation/reversal flow
 
 ### P1 - High Priority (Next Sprint)
-- [ ] PDF/Excel export for all reports
-- [ ] Payment Receipt printing
 - [ ] Weighbridge hardware API integration placeholder
-- [ ] Document cancellation/reversal flow
-
-### P2 - Medium Priority
-- [ ] Document cancellation/reversal flow
-- [ ] Customer/Supplier ledger reports
 - [ ] Trial balance report
 - [ ] Currency revaluation
+- [ ] Bank reconciliation
 
 ### P3 - Low Priority
 - [ ] Dashboard monthly charts with real data
