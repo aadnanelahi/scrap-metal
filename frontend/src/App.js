@@ -148,6 +148,7 @@ function AppRoutes() {
       {/* Admin */}
       <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
       <Route path="/audit-logs" element={<ProtectedRoute><AuditLogsPage /></ProtectedRoute>} />
+      <Route path="/data-management" element={<ProtectedRoute><DataManagementPage /></ProtectedRoute>} />
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/" replace />} />
