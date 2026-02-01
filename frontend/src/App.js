@@ -56,6 +56,7 @@ import PartyLedgerPage from './pages/reports/PartyLedgerPage';
 // Admin
 import UsersPage from './pages/users/UsersPage';
 import AuditLogsPage from './pages/audit/AuditLogsPage';
+import DataManagementPage from './pages/admin/DataManagementPage';
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
