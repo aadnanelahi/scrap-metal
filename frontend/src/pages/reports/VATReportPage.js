@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { reportsAPI } from '../../lib/api';
-import { formatCurrency, formatDate, toISODateString } from '../../lib/utils';
+import { formatCurrency, toISODateString } from '../../lib/utils';
+import { exportReport } from '../../lib/export';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { FileText, Download, Loader2 } from 'lucide-react';
+import { Download, Loader2, FileText, FileSpreadsheet } from 'lucide-react';
 
 export default function VATReportPage() {
   const [report, setReport] = useState(null);
@@ -30,6 +31,37 @@ export default function VATReportPage() {
 
   useEffect(() => { loadReport(); }, []);
 
+  const handleExport = (format) => {
+    if (!report) {
+      toast.error('No report data to export');
+      return;
+    }
+
+    const columns = [
+      { key: 'box', header: 'Box', width: 8 },
+      { key: 'description', header: 'Description', width: 40 },
+      { key: 'amount', header: 'Amount (AED)', format: 'currency', align: 'right', width: 18 },
+      { key: 'vat', header: 'VAT (AED)', format: 'currency', align: 'right', width: 18 }
+    ];
+
+    const data = [
+      { box: '1', description: 'Standard rated supplies in UAE', amount: report.output_vat?.taxable_sales || 0, vat: report.output_vat?.vat_amount || 0 },
+      { box: '6', description: 'Zero-rated exports', amount: report.zero_rated_exports || 0, vat: 0 },
+      { box: '9', description: 'Total value of due tax for the period', amount: '', vat: report.output_vat?.vat_amount || 0 },
+      { box: '10', description: 'Standard rated expenses in UAE', amount: report.input_vat?.taxable_purchases || 0, vat: report.input_vat?.vat_amount || 0 },
+      { box: '13', description: 'Total value of recoverable tax for the period', amount: '', vat: report.input_vat?.vat_amount || 0 },
+      { box: '14', description: 'Payable tax for the period', amount: '', vat: report.net_vat_payable || 0 }
+    ];
+
+    exportReport(format, 'UAE VAT Report', columns, data, {
+      dateRange: `${filters.start_date} to ${filters.end_date}`,
+      totals: {
+        'Net VAT Payable': formatCurrency(report.net_vat_payable || 0)
+      }
+    });
+    toast.success(`Exported to ${format.toUpperCase()}`);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in" data-testid="vat-report-page">
       <div className="flex items-center justify-between">
@@ -37,9 +69,26 @@ export default function VATReportPage() {
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">VAT Report</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">UAE VAT summary for FTA filing</p>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="gap-2" data-testid="export-vat-btn">
+              <Download className="w-4 h-4" />
+              Export
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => handleExport('pdf')}>
+              <FileText className="w-4 h-4 mr-2" />
+              Export to PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleExport('excel')}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Export to Excel
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {/* Filters */}
       <div className="kpi-card">
         <div className="flex gap-4 items-end">
           <div>
@@ -58,7 +107,6 @@ export default function VATReportPage() {
 
       {report && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Output VAT */}
           <div className="kpi-card">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Output VAT (Sales)</h3>
             <div className="space-y-2">
@@ -73,7 +121,6 @@ export default function VATReportPage() {
             </div>
           </div>
 
-          {/* Input VAT */}
           <div className="kpi-card">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Input VAT (Purchases)</h3>
             <div className="space-y-2">
@@ -88,7 +135,6 @@ export default function VATReportPage() {
             </div>
           </div>
 
-          {/* Zero Rated */}
           <div className="kpi-card">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Zero-Rated Exports</h3>
             <div className="space-y-2">
@@ -100,13 +146,10 @@ export default function VATReportPage() {
             </div>
           </div>
 
-          {/* Net VAT */}
           <div className="kpi-card bg-slate-900 text-white">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Net VAT Payable</h3>
             <div className="space-y-2">
-              <p className="text-3xl font-mono font-bold">
-                {formatCurrency(report.net_vat_payable || 0)}
-              </p>
+              <p className="text-3xl font-mono font-bold">{formatCurrency(report.net_vat_payable || 0)}</p>
               <p className="text-xs text-slate-400">
                 {(report.net_vat_payable || 0) > 0 ? 'Amount payable to FTA' : 'Refund due from FTA'}
               </p>
@@ -115,7 +158,6 @@ export default function VATReportPage() {
         </div>
       )}
 
-      {/* Summary Table */}
       {report && (
         <div className="kpi-card">
           <h3 className="fieldset-legend">VAT Return Summary (Box Format)</h3>
