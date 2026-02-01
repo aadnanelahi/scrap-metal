@@ -168,6 +168,7 @@ export const localPurchasesAPI = {
   create: (data) => api.post('/local-purchases', data),
   update: (id, data) => api.put(`/local-purchases/${id}`, data),
   post: (id) => api.post(`/local-purchases/${id}/post`),
+  cancel: (id, reason) => api.post(`/local-purchases/${id}/cancel?reason=${encodeURIComponent(reason)}`),
 };
 
 // International Purchases
@@ -186,6 +187,7 @@ export const localSalesAPI = {
   create: (data) => api.post('/local-sales', data),
   update: (id, data) => api.put(`/local-sales/${id}`, data),
   post: (id) => api.post(`/local-sales/${id}/post`),
+  cancel: (id, reason) => api.post(`/local-sales/${id}/cancel?reason=${encodeURIComponent(reason)}`),
 };
 
 // Export Sales
@@ -212,6 +214,14 @@ export const accountsAPI = {
 // Journal Entries
 export const journalEntriesAPI = {
   list: (params) => api.get('/journal-entries', { params }),
+};
+
+// Payments
+export const paymentsAPI = {
+  list: (params) => api.get('/payments', { params }),
+  get: (id) => api.get(`/payments/${id}`),
+  create: (data) => api.post('/payments', data),
+  post: (id) => api.post(`/payments/${id}/post`),
 };
 
 // Audit Logs
