@@ -77,6 +77,15 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **Supplier Ledger** ✨ NEW
 - **PDF/Excel Export** ✨ NEW - All reports exportable
 
+### ✅ Admin Features
+- User management
+- Audit logs
+- **Data Management** ✨ NEW (Admin only)
+  - Complete database backup (JSON export)
+  - Restore from backup file
+  - Reset system data with options to preserve users/master data
+  - Database statistics view
+
 ### ✅ Document Management
 - **Document Cancellation** ✨ NEW - Cancel PO/SO with automatic reversal entries
 - Cancellation reason tracking
