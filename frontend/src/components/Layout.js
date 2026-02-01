@@ -117,6 +117,12 @@ const navItems = [
     icon: FileText,
     path: '/audit-logs',
   },
+  {
+    title: 'Data Management',
+    icon: HardDrive,
+    path: '/data-management',
+    adminOnly: true,
+  },
 ];
 
 export const Layout = ({ children }) => {
