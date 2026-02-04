@@ -187,8 +187,34 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - `/api/dashboard/*` - Dashboard KPIs
 - `/api/audit-logs` - Audit trail
 
+## Deployment Package (February 2026) ✅ COMPLETE
+
+### Self-Installing Package Created
+- **Download URL**: `https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz`
+- **Package Size**: ~850KB
+- **Target OS**: Ubuntu 22.04 / 24.04 LTS
+
+### Installation Script (`install.sh`) Features
+- Fully automated installation (no manual steps)
+- Installs all dependencies: Node.js 20, Python 3.11, MongoDB 8.0, PM2
+- Creates Python virtual environment
+- Configures firewall (UFW)
+- Sets up PM2 process manager for auto-restart
+- Creates default admin user
+- Seeds sample data
+
+### Default Credentials After Install
+- **Email**: admin@scrapos.local
+- **Password**: Admin@123
+
 ## Next Action Items
-1. Implement PDF/Excel export using jsPDF and xlsx libraries
-2. Build International Purchase and Export Sales form UIs
-3. Add document reversal functionality
-4. Implement customer/supplier aging reports
+1. Implement Trial Balance report
+2. Add scheduled/automated backups feature
+3. Add international suppliers/customers to seed data
+4. Break down server.py into modular routers (refactoring)
+
+## Future/Backlog
+- SaaS multi-tenancy architecture
+- Weighbridge hardware integration
+- Offline mode (local fonts)
+- AI-powered business insights
