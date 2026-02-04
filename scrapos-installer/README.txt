@@ -1,67 +1,22 @@
-╔═══════════════════════════════════════════════════════════╗
-║           ScrapOS ERP - Installation Package              ║
-║              For Ubuntu 22.04 / 24.04 LTS                 ║
-╚═══════════════════════════════════════════════════════════╝
+ScrapOS ERP - Quick Start
+═════════════════════════
 
-REQUIREMENTS:
-- Ubuntu 22.04 or 24.04 LTS (fresh installation recommended)
-- Minimum 2GB RAM, 20GB disk space
-- User with sudo privileges
-- Internet connection (for downloading dependencies)
+INSTALLATION (5 commands):
 
-═══════════════════════════════════════════════════════════
-              INSTALLATION STEPS (3 EASY STEPS)
-═══════════════════════════════════════════════════════════
+1. wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
+2. tar -xzvf scrapos-erp-installer.tar.gz
+3. cd scrapos-installer
+4. chmod +x install.sh
+5. ./install.sh
 
-STEP 1: Extract the package
-─────────────────────────────
-   tar -xzvf scrapos-erp-installer.tar.gz
+LOGIN:
+  URL:      http://YOUR-SERVER-IP:3000
+  Email:    admin@scrapos.local
+  Password: Admin@123
 
-STEP 2: Go into the folder
-─────────────────────────────
-   cd scrapos-installer
+COMMANDS:
+  pm2 status      - Check status
+  pm2 logs        - View logs
+  pm2 restart all - Restart
 
-STEP 3: Run the installer
-─────────────────────────────
-   chmod +x install.sh
-   ./install.sh
-
-═══════════════════════════════════════════════════════════
-
-The installer will:
-✓ Install all system dependencies
-✓ Install MongoDB database
-✓ Install Node.js and Python
-✓ Configure the application
-✓ Start all services automatically
-✓ Create an admin user for you
-
-After installation completes, you will see:
-- Web URL to access the application
-- Login credentials
-
-═══════════════════════════════════════════════════════════
-                    DEFAULT LOGIN
-═══════════════════════════════════════════════════════════
-Email:     admin@scrapos.local
-Password:  Admin@123
-
-⚠️  Change your password after first login!
-
-═══════════════════════════════════════════════════════════
-                    USEFUL COMMANDS
-═══════════════════════════════════════════════════════════
-Check status:     pm2 status
-View logs:        pm2 logs
-Restart all:      pm2 restart all
-Stop all:         pm2 stop all
-
-═══════════════════════════════════════════════════════════
-                      SUPPORT
-═══════════════════════════════════════════════════════════
-If you encounter any issues during installation, please
-check the error message and ensure:
-1. You are running Ubuntu 22.04 or 24.04
-2. You have internet connection
-3. You are NOT running as root (don't use sudo ./install.sh)
-
+See INSTALLATION_GUIDE.txt for detailed instructions.
