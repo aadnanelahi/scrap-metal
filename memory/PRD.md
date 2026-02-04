@@ -187,25 +187,43 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - `/api/dashboard/*` - Dashboard KPIs
 - `/api/audit-logs` - Audit trail
 
-## Deployment Package (February 2026) ✅ COMPLETE
+## Deployment Package (February 2026) ✅ COMPLETE - v1.1
 
 ### Self-Installing Package Created
 - **Download URL**: `https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz`
 - **Package Size**: ~850KB
 - **Target OS**: Ubuntu 22.04 / 24.04 LTS
+- **Version**: 1.1 (Fixed .env file creation issue)
 
 ### Installation Script (`install.sh`) Features
 - Fully automated installation (no manual steps)
-- Installs all dependencies: Node.js 20, Python 3.11, MongoDB 8.0, PM2
-- Creates Python virtual environment
+- Installs all dependencies: Node.js 20, Python 3, MongoDB 8.0, PM2
+- Creates Python virtual environment with all packages
+- **Automatically creates .env files** for both backend and frontend
+- Generates secure JWT secret
 - Configures firewall (UFW)
 - Sets up PM2 process manager for auto-restart
+- Creates logs directory at /opt/scrapos/logs/
 - Creates default admin user
 - Seeds sample data
+
+### Package Contents
+- `install.sh` - Main installer script
+- `INSTALLATION_GUIDE.txt` - Step-by-step guide for non-IT users
+- `README.txt` - Quick reference
+- `backend/` - FastAPI application
+- `frontend/` - React application
 
 ### Default Credentials After Install
 - **Email**: admin@scrapos.local
 - **Password**: Admin@123
+
+### File Locations After Install
+- Application: `/opt/scrapos/`
+- Backend: `/opt/scrapos/backend/`
+- Frontend: `/opt/scrapos/frontend/`
+- Logs: `/opt/scrapos/logs/`
+- PM2 Config: `/opt/scrapos/ecosystem.config.js`
 
 ## Next Action Items
 1. Implement Trial Balance report
