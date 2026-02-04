@@ -1,0 +1,161 @@
+
+═══════════════════════════════════════════════════════════════════════════════
+                    SCRAPOS ERP - INSTALLATION GUIDE
+                         For Non-IT Persons
+                            Version 1.1
+═══════════════════════════════════════════════════════════════════════════════
+
+
+WHAT YOU NEED BEFORE STARTING:
+─────────────────────────────────────────────────────────────────────────────────
+  • Ubuntu 22.04 or 24.04 server (fresh installation is best)
+  • Internet connection
+  • A user account with sudo password (NOT root)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         STEP-BY-STEP INSTRUCTIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+
+STEP 1: OPEN TERMINAL
+─────────────────────────────────────────────────────────────────────────────────
+  • On your Ubuntu server, open the Terminal application
+  • Or connect via SSH from another computer
+
+
+STEP 2: DOWNLOAD THE PACKAGE
+─────────────────────────────────────────────────────────────────────────────────
+  Copy and paste this command, then press ENTER:
+
+  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
+
+
+STEP 3: EXTRACT THE PACKAGE
+─────────────────────────────────────────────────────────────────────────────────
+  Copy and paste this command, then press ENTER:
+
+  tar -xzvf scrapos-erp-installer.tar.gz
+
+
+STEP 4: GO TO THE FOLDER
+─────────────────────────────────────────────────────────────────────────────────
+  Copy and paste this command, then press ENTER:
+
+  cd scrapos-installer
+
+
+STEP 5: MAKE THE SCRIPT EXECUTABLE
+─────────────────────────────────────────────────────────────────────────────────
+  Copy and paste this command, then press ENTER:
+
+  chmod +x install.sh
+
+
+STEP 6: RUN THE INSTALLER
+─────────────────────────────────────────────────────────────────────────────────
+  Copy and paste this command, then press ENTER:
+
+  ./install.sh
+
+  • The script will ask: "Do you want to continue? (y/n)"
+  • Type: y
+  • Press ENTER
+  • Wait for installation to complete (10-20 minutes)
+  • Enter your sudo password when asked
+
+
+STEP 7: INSTALLATION COMPLETE!
+─────────────────────────────────────────────────────────────────────────────────
+  When finished, you will see:
+  
+  • Your server IP address
+  • The URL to open in browser
+  • Login credentials
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         ALL COMMANDS IN ONE PLACE
+═══════════════════════════════════════════════════════════════════════════════
+
+  Copy these one by one:
+
+  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
+  tar -xzvf scrapos-erp-installer.tar.gz
+  cd scrapos-installer
+  chmod +x install.sh
+  ./install.sh
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         AFTER INSTALLATION
+═══════════════════════════════════════════════════════════════════════════════
+
+  HOW TO ACCESS THE APPLICATION:
+  ─────────────────────────────────────────────────────────────────────────────
+  • Open a web browser (Chrome, Firefox, Edge)
+  • Type in the address bar: http://YOUR-SERVER-IP:3000
+  • Example: http://192.168.1.100:3000
+
+  LOGIN CREDENTIALS:
+  ─────────────────────────────────────────────────────────────────────────────
+  • Email:     admin@scrapos.local
+  • Password:  Admin@123
+
+  IMPORTANT: Change your password after first login!
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         USEFUL COMMANDS
+═══════════════════════════════════════════════════════════════════════════════
+
+  Check if application is running:
+    pm2 status
+
+  View application logs:
+    pm2 logs
+
+  Restart application:
+    pm2 restart all
+
+  Stop application:
+    pm2 stop all
+
+  Start application:
+    pm2 start all
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+  PROBLEM: "Permission denied" error
+  SOLUTION: Make sure you are NOT using "sudo ./install.sh"
+            Just use: ./install.sh
+
+  PROBLEM: Cannot connect to the application
+  SOLUTION: 
+    1. Check if services are running: pm2 status
+    2. Make sure firewall allows ports 3000 and 8001
+    3. Use the correct IP address of your server
+
+  PROBLEM: Forgot password
+  SOLUTION: Contact system administrator or reinstall
+
+  PROBLEM: Installation failed midway
+  SOLUTION: Run the installer again: ./install.sh
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         FILE LOCATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+  Application files:     /opt/scrapos/
+  Backend:               /opt/scrapos/backend/
+  Frontend:              /opt/scrapos/frontend/
+  Logs:                  /opt/scrapos/logs/
+  PM2 Configuration:     /opt/scrapos/ecosystem.config.js
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
