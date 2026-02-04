@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 class ScrapOSAPITester:
-    def __init__(self, base_url="https://scrapmanage-1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://scrapos-one-click.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.user_id = None
