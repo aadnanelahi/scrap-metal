@@ -141,6 +141,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **Payments Page**: Receipts & Payment Vouchers with print ✨
 - **Party Ledger**: Customer & Supplier account statements ✨
 - **Document Cancellation**: Cancel PO/SO with reversal entries ✨
+- **Company Logo & Slogan**: Upload company logo and tagline - appears on all printed documents (PO, SO, Weighbridge Slips, Payment Receipts) ✨ NEW
 
 ## Prioritized Backlog
 
