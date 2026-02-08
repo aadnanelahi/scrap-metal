@@ -1,16 +1,21 @@
 
 ═══════════════════════════════════════════════════════════════════════════════
                     SCRAPOS ERP - INSTALLATION GUIDE
-                         For Non-IT Persons
-                            Version 1.1
+                      COMPLETE OFFLINE VERSION
+                            Version 2.0
 ═══════════════════════════════════════════════════════════════════════════════
+
+This is the OFFLINE version of ScrapOS ERP. Once installed, the application
+works completely without internet connection. Perfect for factories, yards,
+and warehouses on isolated networks.
 
 
 WHAT YOU NEED BEFORE STARTING:
 ─────────────────────────────────────────────────────────────────────────────────
   • Ubuntu 22.04 or 24.04 server (fresh installation is best)
-  • Internet connection
+  • Internet connection ONLY during installation (to download dependencies)
   • A user account with sudo password (NOT root)
+  • Minimum: 2GB RAM, 20GB disk space
 
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -28,14 +33,14 @@ STEP 2: DOWNLOAD THE PACKAGE
 ─────────────────────────────────────────────────────────────────────────────────
   Copy and paste this command, then press ENTER:
 
-  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
+  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-offline.tar.gz
 
 
 STEP 3: EXTRACT THE PACKAGE
 ─────────────────────────────────────────────────────────────────────────────────
   Copy and paste this command, then press ENTER:
 
-  tar -xzvf scrapos-erp-installer.tar.gz
+  tar -xzvf scrapos-erp-offline.tar.gz
 
 
 STEP 4: GO TO THE FOLDER
@@ -80,8 +85,8 @@ STEP 7: INSTALLATION COMPLETE!
 
   Copy these one by one:
 
-  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
-  tar -xzvf scrapos-erp-installer.tar.gz
+  wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-offline.tar.gz
+  tar -xzvf scrapos-erp-offline.tar.gz
   cd scrapos-installer
   chmod +x install.sh
   ./install.sh
@@ -104,6 +109,19 @@ STEP 7: INSTALLATION COMPLETE!
 
   IMPORTANT: Change your password after first login!
 
+
+═══════════════════════════════════════════════════════════════════════════════
+                         OFFLINE MODE FEATURES
+═══════════════════════════════════════════════════════════════════════════════
+
+  After installation, the application works WITHOUT internet:
+  
+  ✓ All fonts are stored locally (no Google Fonts needed)
+  ✓ No external CDN dependencies
+  ✓ Database runs locally on your server
+  ✓ Perfect for isolated LAN/VPN networks
+  ✓ Works in factories without internet access
+  
 
 ═══════════════════════════════════════════════════════════════════════════════
                          USEFUL COMMANDS
@@ -155,6 +173,27 @@ STEP 7: INSTALLATION COMPLETE!
   Frontend:              /opt/scrapos/frontend/
   Logs:                  /opt/scrapos/logs/
   PM2 Configuration:     /opt/scrapos/ecosystem.config.js
+  Local Fonts:           /opt/scrapos/frontend/build/fonts/
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         COMPANY LOGO SETUP
+═══════════════════════════════════════════════════════════════════════════════
+
+  To add your company logo:
+  
+  1. Login to the application
+  2. Go to Master Data > Companies
+  3. Click "New Company" or Edit existing company
+  4. Click "Upload Logo" and select your logo image
+  5. Add your company slogan/tagline
+  6. Click Save
+  
+  Your logo will appear on all printed documents:
+  • Purchase Orders
+  • Sales Orders
+  • Weighbridge Slips
+  • Payment Receipts
 
 
 ═══════════════════════════════════════════════════════════════════════════════
