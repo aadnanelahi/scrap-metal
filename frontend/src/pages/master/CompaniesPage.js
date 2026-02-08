@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { companiesAPI } from '../../lib/api';
 import { formatDate } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -7,7 +7,7 @@ import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Building2, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Building2, Loader2, Upload, X } from 'lucide-react';
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState([]);
@@ -15,9 +15,11 @@ export default function CompaniesPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
-    name: '', code: '', address: '', country: 'UAE', currency: 'AED', vat_number: '', phone: '', email: ''
+    name: '', code: '', address: '', country: 'UAE', currency: 'AED', vat_number: '', phone: '', email: '', slogan: '', logo: ''
   });
   const [saving, setSaving] = useState(false);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => { loadData(); }, []);
 
@@ -58,8 +60,38 @@ export default function CompaniesPage() {
 
   const handleEdit = (company) => {
     setEditing(company);
-    setFormData({ ...company });
+    setFormData({ ...company, slogan: company.slogan || '', logo: company.logo || '' });
+    setLogoPreview(company.logo || null);
     setShowDialog(true);
+  };
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size should be less than 2MB');
+      return;
+    }
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result;
+      setLogoPreview(base64);
+      setFormData({ ...formData, logo: base64 });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoPreview(null);
+    setFormData({ ...formData, logo: '' });
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDelete = async (id) => {
@@ -75,7 +107,9 @@ export default function CompaniesPage() {
 
   const resetForm = () => {
     setEditing(null);
-    setFormData({ name: '', code: '', address: '', country: 'UAE', currency: 'AED', vat_number: '', phone: '', email: '' });
+    setFormData({ name: '', code: '', address: '', country: 'UAE', currency: 'AED', vat_number: '', phone: '', email: '', slogan: '', logo: '' });
+    setLogoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   if (loading) return <div className="flex items-center justify-center h-96"><Loader2 className="w-8 h-8 animate-spin text-orange-500" /></div>;
