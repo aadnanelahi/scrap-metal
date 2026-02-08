@@ -1,10 +1,13 @@
-ScrapOS ERP - Quick Start
-═════════════════════════
+ScrapOS ERP - OFFLINE VERSION
+══════════════════════════════
+
+This package works completely OFFLINE after installation.
+No internet required for daily use.
 
 INSTALLATION (5 commands):
 
-1. wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-installer.tar.gz
-2. tar -xzvf scrapos-erp-installer.tar.gz
+1. wget https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-offline.tar.gz
+2. tar -xzvf scrapos-erp-offline.tar.gz
 3. cd scrapos-installer
 4. chmod +x install.sh
 5. ./install.sh
@@ -18,5 +21,11 @@ COMMANDS:
   pm2 status      - Check status
   pm2 logs        - View logs
   pm2 restart all - Restart
+
+OFFLINE FEATURES:
+  ✓ Local fonts (no Google Fonts)
+  ✓ Local database (MongoDB)
+  ✓ No external dependencies
+  ✓ Works on isolated LAN
 
 See INSTALLATION_GUIDE.txt for detailed instructions.
