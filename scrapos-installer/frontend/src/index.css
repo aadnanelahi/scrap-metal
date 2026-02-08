@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Manrope:wght@400;500;600;700;800&display=swap');
+/* OFFLINE MODE: Using local fonts instead of Google Fonts */
+/* Fonts are loaded from /fonts/fonts.css which is linked in index.html */
 
 @tailwind base;
 @tailwind components;
