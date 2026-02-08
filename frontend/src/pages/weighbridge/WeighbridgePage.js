@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { weighbridgeEntriesAPI, weighbridgesAPI, branchesAPI } from '../../lib/api';
+import { weighbridgeEntriesAPI, weighbridgesAPI, branchesAPI, companiesAPI } from '../../lib/api';
 import { formatNumber, formatDateTime, getStatusColor, printDocument, generateWeighbridgeSlipHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -14,6 +14,7 @@ export default function WeighbridgePage() {
   const [entries, setEntries] = useState([]);
   const [weighbridges, setWeighbridges] = useState([]);
   const [branches, setBranches] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [showSecondWeightDialog, setShowSecondWeightDialog] = useState(false);
@@ -35,14 +36,17 @@ export default function WeighbridgePage() {
 
   const loadData = async () => {
     try {
-      const [entriesRes, wbRes, branchRes] = await Promise.all([
+      const [entriesRes, wbRes, branchRes, companiesRes] = await Promise.all([
         weighbridgeEntriesAPI.list(),
         weighbridgesAPI.list(),
-        branchesAPI.list()
+        branchesAPI.list(),
+        companiesAPI.list()
       ]);
       setEntries(entriesRes.data || []);
       setWeighbridges(wbRes.data || []);
       setBranches(branchRes.data || []);
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
