@@ -305,7 +305,15 @@ export const generatePOPrintHTML = (po, company = null) => {
 };
 
 // Generate Sales Order HTML for printing
-export const generateSOPrintHTML = (so, companyName = 'ScrapOS Trading LLC') => {
+export const generateSOPrintHTML = (so, company = null) => {
+  const companyName = company?.name || so.company_name || 'ScrapOS Trading LLC';
+  const companyLogo = company?.logo || so.company_logo || '';
+  const companySlogan = company?.slogan || so.company_slogan || '';
+  const companyAddress = company?.address || so.company_address || '';
+  const companyPhone = company?.phone || so.company_phone || '';
+  const companyEmail = company?.email || so.company_email || '';
+  const companyVat = company?.vat_number || so.company_vat || '';
+  
   const statusClass = so.status === 'posted' ? 'status-posted' : 
                       so.status === 'cancelled' ? 'status-cancelled' :
                       so.status === 'pending' ? 'status-pending' : 'status-draft';
@@ -323,10 +331,17 @@ export const generateSOPrintHTML = (so, companyName = 'ScrapOS Trading LLC') => 
     </tr>
   `).join('');
 
+  const logoHTML = companyLogo ? `<img src="${companyLogo}" alt="${companyName}" style="max-height:80px;max-width:200px;object-fit:contain;margin-bottom:10px;" />` : '';
+
   return `
     <div class="print-header">
+      ${logoHTML}
       <h1>${companyName}</h1>
-      <p>Sales Order</p>
+      ${companySlogan ? `<p style="font-style:italic;color:#64748b;margin-top:5px;">${companySlogan}</p>` : ''}
+      ${companyAddress ? `<p style="font-size:11px;color:#64748b;margin-top:5px;">${companyAddress}</p>` : ''}
+      ${companyPhone || companyEmail ? `<p style="font-size:11px;color:#64748b;">${[companyPhone, companyEmail].filter(Boolean).join(' | ')}</p>` : ''}
+      ${companyVat ? `<p style="font-size:11px;color:#64748b;">VAT: ${companyVat}</p>` : ''}
+      <p style="margin-top:10px;font-weight:600;font-size:16px;">SALES ORDER</p>
     </div>
     
     <div class="doc-info">
