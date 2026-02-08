@@ -480,11 +480,24 @@ export const generateWeighbridgeSlipHTML = (entry, company = null) => {
 };
 
 // Generate Payment Receipt HTML for printing
-export const generatePaymentReceiptHTML = (receipt, companyName = 'ScrapOS Trading LLC') => {
+export const generatePaymentReceiptHTML = (receipt, company = null) => {
+  const companyName = company?.name || receipt.company_name || 'ScrapOS Trading LLC';
+  const companyLogo = company?.logo || receipt.company_logo || '';
+  const companySlogan = company?.slogan || receipt.company_slogan || '';
+  const companyAddress = company?.address || receipt.company_address || '';
+  const companyPhone = company?.phone || receipt.company_phone || '';
+  const companyVat = company?.vat_number || receipt.company_vat || '';
+  
+  const logoHTML = companyLogo ? `<img src="${companyLogo}" alt="${companyName}" style="max-height:70px;max-width:180px;object-fit:contain;margin-bottom:8px;" />` : '';
+  
   return `
     <div class="print-header">
+      ${logoHTML}
       <h1>${companyName}</h1>
-      <p>Payment Receipt</p>
+      ${companySlogan ? `<p style="font-style:italic;color:#64748b;margin-top:5px;">${companySlogan}</p>` : ''}
+      ${companyAddress ? `<p style="font-size:11px;color:#64748b;margin-top:5px;">${companyAddress}</p>` : ''}
+      ${companyVat ? `<p style="font-size:11px;color:#64748b;">VAT: ${companyVat}</p>` : ''}
+      <p style="margin-top:10px;font-weight:600;font-size:16px;">${receipt.type === 'received' ? 'PAYMENT RECEIPT' : 'PAYMENT VOUCHER'}</p>
     </div>
     
     <div class="doc-info">
