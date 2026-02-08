@@ -405,11 +405,22 @@ export const generateSOPrintHTML = (so, company = null) => {
 };
 
 // Generate Weighbridge Slip HTML for printing
-export const generateWeighbridgeSlipHTML = (entry, companyName = 'ScrapOS Trading LLC') => {
+export const generateWeighbridgeSlipHTML = (entry, company = null) => {
+  const companyName = company?.name || entry.company_name || 'ScrapOS Trading LLC';
+  const companyLogo = company?.logo || entry.company_logo || '';
+  const companySlogan = company?.slogan || entry.company_slogan || '';
+  const companyAddress = company?.address || entry.company_address || '';
+  const companyPhone = company?.phone || entry.company_phone || '';
+  
+  const logoHTML = companyLogo ? `<img src="${companyLogo}" alt="${companyName}" style="max-height:60px;max-width:150px;object-fit:contain;margin-bottom:8px;" />` : '';
+  
   return `
     <div class="print-header">
+      ${logoHTML}
       <h1>${companyName}</h1>
-      <p>Weighbridge Slip</p>
+      ${companySlogan ? `<p style="font-style:italic;color:#64748b;margin-top:3px;font-size:11px;">${companySlogan}</p>` : ''}
+      ${companyAddress ? `<p style="font-size:10px;color:#64748b;margin-top:3px;">${companyAddress}</p>` : ''}
+      <p style="margin-top:8px;font-weight:600;font-size:14px;">WEIGHBRIDGE SLIP</p>
     </div>
     
     <div class="doc-info">
