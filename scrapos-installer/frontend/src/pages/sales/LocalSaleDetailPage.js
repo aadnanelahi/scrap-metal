@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { localSalesAPI } from '../../lib/api';
+import { localSalesAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generateSOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -14,6 +14,7 @@ export default function LocalSaleDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [so, setSo] = useState(null);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -21,13 +22,19 @@ export default function LocalSaleDetailPage() {
   const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
-    loadSO();
+    loadData();
   }, [id]);
 
-  const loadSO = async () => {
+  const loadData = async () => {
     try {
-      const res = await localSalesAPI.get(id);
-      setSo(res.data);
+      const [soRes, companiesRes] = await Promise.all([
+        localSalesAPI.get(id),
+        companiesAPI.list()
+      ]);
+      setSo(soRes.data);
+      const companies = companiesRes.data || [];
+      const matchingCompany = companies.find(c => c.id === soRes.data.company_id) || companies.find(c => c.is_active) || companies[0];
+      setCompany(matchingCompany || null);
     } catch (error) {
       toast.error('Failed to load sales order');
       navigate('/local-sales');
@@ -41,7 +48,7 @@ export default function LocalSaleDetailPage() {
     try {
       await localSalesAPI.post(id);
       toast.success('Sales order posted');
-      loadSO();
+      loadData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to post');
     } finally {
@@ -59,7 +66,7 @@ export default function LocalSaleDetailPage() {
       await localSalesAPI.cancel(id, cancelReason);
       toast.success('Sales order cancelled');
       setShowCancelDialog(false);
-      loadSO();
+      loadData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to cancel');
     } finally {
@@ -68,7 +75,7 @@ export default function LocalSaleDetailPage() {
   };
 
   const handlePrint = () => {
-    const html = generateSOPrintHTML(so);
+    const html = generateSOPrintHTML(so, company);
     printDocument(html, `SO-${so.order_number}`);
   };
 
