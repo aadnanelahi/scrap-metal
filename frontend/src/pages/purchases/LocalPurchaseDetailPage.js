@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { localPurchasesAPI } from '../../lib/api';
+import { localPurchasesAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -14,6 +14,7 @@ export default function LocalPurchaseDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [po, setPo] = useState(null);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
@@ -21,13 +22,20 @@ export default function LocalPurchaseDetailPage() {
   const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
-    loadPO();
+    loadData();
   }, [id]);
 
-  const loadPO = async () => {
+  const loadData = async () => {
     try {
-      const res = await localPurchasesAPI.get(id);
-      setPo(res.data);
+      const [poRes, companiesRes] = await Promise.all([
+        localPurchasesAPI.get(id),
+        companiesAPI.list()
+      ]);
+      setPo(poRes.data);
+      // Get the first active company or the one matching the PO
+      const companies = companiesRes.data || [];
+      const matchingCompany = companies.find(c => c.id === poRes.data.company_id) || companies.find(c => c.is_active) || companies[0];
+      setCompany(matchingCompany || null);
     } catch (error) {
       toast.error('Failed to load purchase order');
       navigate('/local-purchases');
@@ -41,7 +49,7 @@ export default function LocalPurchaseDetailPage() {
     try {
       await localPurchasesAPI.post(id);
       toast.success('Purchase order posted');
-      loadPO();
+      loadData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to post');
     } finally {
@@ -59,7 +67,7 @@ export default function LocalPurchaseDetailPage() {
       await localPurchasesAPI.cancel(id, cancelReason);
       toast.success('Purchase order cancelled');
       setShowCancelDialog(false);
-      loadPO();
+      loadData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to cancel');
     } finally {
@@ -68,7 +76,7 @@ export default function LocalPurchaseDetailPage() {
   };
 
   const handlePrint = () => {
-    const html = generatePOPrintHTML(po);
+    const html = generatePOPrintHTML(po, company);
     printDocument(html, `PO-${po.order_number}`);
   };
 
