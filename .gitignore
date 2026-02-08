@@ -117,3 +117,7 @@ frontend/node_modules/.cache/default-development/11.pack
 *.env
 *.env.*
 scrapos-installer/frontend/node_modules/.cache/default-development/3.pack
+-e 
+# Environment files
+*.env
+*.env.*
