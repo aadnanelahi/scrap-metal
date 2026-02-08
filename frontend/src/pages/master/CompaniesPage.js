@@ -180,15 +180,29 @@ export default function CompaniesPage() {
       </div>
       <div className="kpi-card p-0 overflow-hidden">
         <table className="erp-table" data-testid="companies-table">
-          <thead><tr><th>Code</th><th>Name</th><th>Country</th><th>Currency</th><th>VAT Number</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Logo</th><th>Code</th><th>Name</th><th>Country</th><th>Currency</th><th>VAT Number</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody>
             {companies.length === 0 ? (
-              <tr><td colSpan={7} className="text-center py-12 text-slate-400"><Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>No companies yet</p></td></tr>
+              <tr><td colSpan={8} className="text-center py-12 text-slate-400"><Building2 className="w-12 h-12 mx-auto mb-2 opacity-50" /><p>No companies yet</p></td></tr>
             ) : (
               companies.map((c) => (
                 <tr key={c.id} data-testid={`company-row-${c.id}`}>
+                  <td>
+                    {c.logo ? (
+                      <img src={c.logo} alt={c.name} className="w-10 h-10 object-contain rounded border bg-white" />
+                    ) : (
+                      <div className="w-10 h-10 rounded border bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-slate-400" />
+                      </div>
+                    )}
+                  </td>
                   <td className="font-mono font-medium">{c.code}</td>
-                  <td className="font-medium">{c.name}</td>
+                  <td>
+                    <div>
+                      <p className="font-medium">{c.name}</p>
+                      {c.slogan && <p className="text-xs text-slate-500 dark:text-slate-400">{c.slogan}</p>}
+                    </div>
+                  </td>
                   <td>{c.country}</td>
                   <td>{c.currency}</td>
                   <td>{c.vat_number || '-'}</td>
