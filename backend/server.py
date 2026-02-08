@@ -103,6 +103,8 @@ class CompanyBase(BaseModel):
     vat_number: Optional[str] = None
     phone: Optional[str] = None
     email: Optional[str] = None
+    slogan: Optional[str] = None
+    logo: Optional[str] = None  # Base64 encoded image
     is_active: bool = True
 
 class Company(CompanyBase):
