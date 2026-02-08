@@ -19,7 +19,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Audit logging (who did what & when)
 
 ### ✅ Master Data
-- Companies CRUD
+- Companies CRUD (with **Logo upload** and **Slogan/Tagline** support)
 - Branches/Yards CRUD
 - Customers CRUD (Local & International segregation)
 - Suppliers CRUD (Local & International segregation)
