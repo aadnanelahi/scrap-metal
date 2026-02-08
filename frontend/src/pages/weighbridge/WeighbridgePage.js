@@ -352,7 +352,7 @@ export default function WeighbridgePage() {
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          const html = generateWeighbridgeSlipHTML(entry);
+                          const html = generateWeighbridgeSlipHTML(entry, company);
                           printDocument(html, `WB-${entry.slip_number}`);
                         }}
                         data-testid={`wb-print-btn-${entry.id}`}
