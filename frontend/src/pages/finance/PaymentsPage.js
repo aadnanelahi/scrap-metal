@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { paymentsAPI, customersAPI, suppliersAPI } from '../../lib/api';
+import { paymentsAPI, customersAPI, suppliersAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, toISODateString, getStatusColor, printDocument, generatePaymentReceiptHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -15,6 +15,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,14 +40,17 @@ export default function PaymentsPage() {
 
   const loadData = async () => {
     try {
-      const [paymentsRes, custRes, suppRes] = await Promise.all([
+      const [paymentsRes, custRes, suppRes, companiesRes] = await Promise.all([
         paymentsAPI.list(),
         customersAPI.list(),
-        suppliersAPI.list()
+        suppliersAPI.list(),
+        companiesAPI.list()
       ]);
       setPayments(paymentsRes.data || []);
       setCustomers(custRes.data || []);
       setSuppliers(suppRes.data || []);
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -105,7 +109,7 @@ export default function PaymentsPage() {
   };
 
   const handlePrint = (payment) => {
-    const html = generatePaymentReceiptHTML(payment);
+    const html = generatePaymentReceiptHTML(payment, company);
     printDocument(html, `Receipt-${payment.receipt_number}`);
   };
 
