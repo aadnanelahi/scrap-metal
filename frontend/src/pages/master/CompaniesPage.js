@@ -125,13 +125,44 @@ export default function CompaniesPage() {
           <DialogTrigger asChild>
             <Button className="btn-accent gap-2" data-testid="new-company-btn"><Plus className="w-4 h-4" />New Company</Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-manrope">{editing ? 'Edit' : 'New'} Company</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">
+              {/* Logo Upload */}
+              <div className="space-y-2">
+                <Label className="form-label">Company Logo</Label>
+                <div className="flex items-center gap-4">
+                  {logoPreview ? (
+                    <div className="relative">
+                      <img src={logoPreview} alt="Logo preview" className="w-24 h-24 object-contain border rounded-lg bg-white p-1" />
+                      <button onClick={removeLogo} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+                      <Building2 className="w-8 h-8 text-slate-400" />
+                    </div>
+                  )}
+                  <div>
+                    <input type="file" ref={fileInputRef} onChange={handleLogoUpload} accept="image/*" className="hidden" />
+                    <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2">
+                      <Upload className="w-4 h-4" />
+                      {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                    </Button>
+                    <p className="text-xs text-slate-500 mt-1">PNG, JPG up to 2MB</p>
+                  </div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div><Label className="form-label">Name</Label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="form-input" data-testid="company-name-input" /></div>
                 <div><Label className="form-label">Code</Label><Input value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })} className="form-input" data-testid="company-code-input" /></div>
               </div>
+              
+              {/* Slogan */}
+              <div><Label className="form-label">Slogan / Tagline</Label><Input value={formData.slogan} onChange={(e) => setFormData({ ...formData, slogan: e.target.value })} className="form-input" placeholder="e.g., Excellence in Scrap Metal Trading" /></div>
+              
               <div><Label className="form-label">Address</Label><Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className="form-input" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label className="form-label">Country</Label><Input value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} className="form-input" /></div>
