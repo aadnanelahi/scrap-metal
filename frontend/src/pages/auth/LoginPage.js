@@ -66,6 +66,10 @@ export default function LoginPage() {
           <div className="lg:hidden mb-12">
             <h1 className="text-4xl font-manrope font-bold text-slate-900 dark:text-white">ScrapOS</h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2">Scrap Metal ERP</p>
+            <div className="flex items-center gap-2 mt-3">
+              <img src="/techsight-logo.png" alt="TechSight" className="w-6 h-6 object-contain" />
+              <span className="text-sm text-slate-500">by TechSight Innovation</span>
+            </div>
           </div>
 
           <div className="mb-8">
