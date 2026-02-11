@@ -112,14 +112,14 @@ export default function InventoryPage() {
         <div className="flex gap-4">
           <div className="w-48">
             <Select
-              value={filters.branch_id}
-              onValueChange={(value) => setFilters({ ...filters, branch_id: value })}
+              value={filters.branch_id || "all"}
+              onValueChange={(value) => setFilters({ ...filters, branch_id: value === "all" ? "" : value })}
             >
               <SelectTrigger data-testid="inventory-branch-filter">
                 <SelectValue placeholder="All Branches" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Branches</SelectItem>
+                <SelectItem value="all">All Branches</SelectItem>
                 {branches.map((b) => (
                   <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                 ))}
@@ -128,14 +128,14 @@ export default function InventoryPage() {
           </div>
           <div className="w-48">
             <Select
-              value={filters.item_id}
-              onValueChange={(value) => setFilters({ ...filters, item_id: value })}
+              value={filters.item_id || "all"}
+              onValueChange={(value) => setFilters({ ...filters, item_id: value === "all" ? "" : value })}
             >
               <SelectTrigger data-testid="inventory-item-filter">
                 <SelectValue placeholder="All Items" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Items</SelectItem>
+                <SelectItem value="all">All Items</SelectItem>
                 {items.map((i) => (
                   <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                 ))}

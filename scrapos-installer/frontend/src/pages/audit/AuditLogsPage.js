@@ -45,10 +45,10 @@ export default function AuditLogsPage() {
       <div className="kpi-card">
         <div className="flex gap-4">
           <div className="w-48">
-            <Select value={entityFilter} onValueChange={setEntityFilter}>
+            <Select value={entityFilter || "all"} onValueChange={(v) => setEntityFilter(v === "all" ? "" : v)}>
               <SelectTrigger data-testid="audit-entity-filter"><SelectValue placeholder="All Entities" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Entities</SelectItem>
+                <SelectItem value="all">All Entities</SelectItem>
                 <SelectItem value="user">Users</SelectItem>
                 <SelectItem value="company">Companies</SelectItem>
                 <SelectItem value="customer">Customers</SelectItem>
