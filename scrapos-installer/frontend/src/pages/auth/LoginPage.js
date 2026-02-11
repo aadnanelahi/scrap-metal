@@ -46,10 +46,17 @@ export default function LoginPage() {
         />
         <div className="absolute inset-0 bg-slate-900/60" />
         <div className="relative z-10 flex flex-col justify-end p-12 text-white">
-          <h1 className="text-5xl font-manrope font-bold mb-4">ScrapOS</h1>
+          <h1 className="text-5xl font-manrope font-bold mb-2">ScrapOS</h1>
           <p className="text-xl text-slate-300 max-w-md">
             Commercial Grade Scrap Metal ERP for UAE Trading Companies
           </p>
+          <div className="flex items-center gap-3 mt-6 pt-6 border-t border-white/20">
+            <img src="/techsight-logo.png" alt="TechSight Innovation" className="w-10 h-10 object-contain" />
+            <div>
+              <p className="text-sm text-slate-300">Developed by</p>
+              <p className="font-semibold">TechSight Innovation</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -59,6 +66,10 @@ export default function LoginPage() {
           <div className="lg:hidden mb-12">
             <h1 className="text-4xl font-manrope font-bold text-slate-900 dark:text-white">ScrapOS</h1>
             <p className="text-slate-600 dark:text-slate-400 mt-2">Scrap Metal ERP</p>
+            <div className="flex items-center gap-2 mt-3">
+              <img src="/techsight-logo.png" alt="TechSight" className="w-6 h-6 object-contain" />
+              <span className="text-sm text-slate-500">by TechSight Innovation</span>
+            </div>
           </div>
 
           <div className="mb-8">

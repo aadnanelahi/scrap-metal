@@ -223,16 +223,20 @@ export const Layout = ({ children }) => {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
-            <Link to="/" className="flex items-center gap-2">
+          <div className="flex flex-col items-center justify-center py-4 px-4 border-b border-slate-800">
+            <Link to="/" className="flex items-center gap-2 mb-2">
               <div className="w-8 h-8 bg-orange-500 rounded-sm flex items-center justify-center">
                 <Scale className="w-5 h-5 text-white" />
               </div>
               <span className="text-xl font-manrope font-bold">ScrapOS</span>
             </Link>
+            <div className="flex items-center gap-2 opacity-80">
+              <img src="/techsight-logo.png" alt="TechSight" className="w-5 h-5 object-contain" />
+              <span className="text-xs text-slate-400">by TechSight Innovation</span>
+            </div>
             <button
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-slate-400 hover:text-white"
+              className="lg:hidden text-slate-400 hover:text-white absolute right-4 top-4"
             >
               <X className="w-5 h-5" />
             </button>
