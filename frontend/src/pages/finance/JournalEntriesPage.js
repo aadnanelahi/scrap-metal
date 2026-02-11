@@ -32,10 +32,10 @@ export default function JournalEntriesPage() {
       <div className="kpi-card">
         <div className="flex gap-4">
           <div className="w-48">
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <Select value={typeFilter || "all"} onValueChange={(v) => setTypeFilter(v === "all" ? "" : v)}>
               <SelectTrigger data-testid="je-type-filter"><SelectValue placeholder="All Types" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="local_purchase">Local Purchase</SelectItem>
                 <SelectItem value="intl_purchase">Intl Purchase</SelectItem>
                 <SelectItem value="local_sale">Local Sale</SelectItem>
