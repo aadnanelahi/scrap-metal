@@ -1668,22 +1668,43 @@ async def list_audit_logs(
 
 # ==================== DASHBOARD & REPORTS ====================
 @api_router.get("/dashboard/kpis")
-async def get_dashboard_kpis(current_user: Dict = Depends(get_current_user)):
+async def get_dashboard_kpis(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    # Build date filter
+    date_filter = {}
+    if start_date:
+        date_filter["$gte"] = start_date
+    if end_date:
+        date_filter["$lte"] = end_date
+    
+    # Purchase filters
+    purchase_filter = {"status": "posted"}
+    if date_filter:
+        purchase_filter["order_date"] = date_filter
+    
+    # Sales filters  
+    sales_filter = {"status": "posted"}
+    if date_filter:
+        sales_filter["order_date"] = date_filter
+    
     # Total purchases (local + intl)
-    local_purchases = await db.local_purchases.find({"status": "posted"}, {"_id": 0}).to_list(1000)
-    intl_purchases = await db.intl_purchases.find({"status": "posted"}, {"_id": 0}).to_list(1000)
+    local_purchases = await db.local_purchases.find(purchase_filter, {"_id": 0}).to_list(1000)
+    intl_purchases = await db.intl_purchases.find(purchase_filter, {"_id": 0}).to_list(1000)
     
     total_purchases = sum(p.get('total_amount', 0) for p in local_purchases) + \
                      sum(p.get('total_amount', 0) for p in intl_purchases)
     
     # Total sales (local + export)
-    local_sales = await db.local_sales.find({"status": "posted"}, {"_id": 0}).to_list(1000)
-    export_sales = await db.export_sales.find({"status": "posted"}, {"_id": 0}).to_list(1000)
+    local_sales = await db.local_sales.find(sales_filter, {"_id": 0}).to_list(1000)
+    export_sales = await db.export_sales.find(sales_filter, {"_id": 0}).to_list(1000)
     
     total_sales = sum(s.get('total_amount', 0) for s in local_sales) + \
                  sum(s.get('total_amount', 0) for s in export_sales)
     
-    # Total inventory value
+    # Total inventory value (not filtered by date - current snapshot)
     inventory = await db.inventory_stock.find({}, {"_id": 0}).to_list(1000)
     inventory_value = sum(i.get('total_value', 0) for i in inventory)
     inventory_qty = sum(i.get('quantity', 0) for i in inventory)
@@ -1692,17 +1713,26 @@ async def get_dashboard_kpis(current_user: Dict = Depends(get_current_user)):
     gross_margin = total_sales - total_purchases
     margin_percentage = (gross_margin / total_sales * 100) if total_sales > 0 else 0
     
-    # Pending documents
+    # Pending documents (not filtered by date)
     pending_local_po = await db.local_purchases.count_documents({"status": {"$in": ["draft", "pending"]}})
     pending_intl_po = await db.intl_purchases.count_documents({"status": {"$in": ["draft", "pending"]}})
     pending_local_so = await db.local_sales.count_documents({"status": {"$in": ["draft", "pending"]}})
     pending_export = await db.export_sales.count_documents({"status": {"$in": ["draft", "pending"]}})
     
-    # Weighbridge entries today
-    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    wb_entries_today = await db.weighbridge_entries.count_documents({
-        "created_at": {"$regex": f"^{today}"}
-    })
+    # Weighbridge entries for period
+    wb_filter = {}
+    if start_date and end_date:
+        wb_filter["created_at"] = {"$gte": start_date, "$lte": end_date + "T23:59:59"}
+    elif start_date:
+        wb_filter["created_at"] = {"$gte": start_date}
+    elif end_date:
+        wb_filter["created_at"] = {"$lte": end_date + "T23:59:59"}
+    else:
+        # Default to today
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        wb_filter["created_at"] = {"$regex": f"^{today}"}
+    
+    wb_entries = await db.weighbridge_entries.count_documents(wb_filter)
     
     return {
         "total_purchases": total_purchases,
@@ -1717,7 +1747,11 @@ async def get_dashboard_kpis(current_user: Dict = Depends(get_current_user)):
             "local_sales": pending_local_so,
             "export_sales": pending_export
         },
-        "weighbridge_entries_today": wb_entries_today
+        "weighbridge_entries": wb_entries,
+        "date_range": {
+            "start": start_date,
+            "end": end_date
+        }
     }
 
 @api_router.get("/reports/purchase-register")
