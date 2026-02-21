@@ -515,7 +515,7 @@ class AuditLog(BaseModel):
     user_email: str
     action: str
     entity_type: str
-    entity_id: str
+    entity_id: Optional[str] = None
     old_values: Optional[Dict[str, Any]] = None
     new_values: Optional[Dict[str, Any]] = None
     ip_address: Optional[str] = None
