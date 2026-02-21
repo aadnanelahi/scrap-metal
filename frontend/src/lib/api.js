@@ -233,7 +233,7 @@ export const auditLogsAPI = {
 
 // Dashboard
 export const dashboardAPI = {
-  kpis: () => api.get('/dashboard/kpis'),
+  kpis: (params) => api.get('/dashboard/kpis', { params }),
 };
 
 // Reports
