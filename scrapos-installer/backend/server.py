@@ -668,6 +668,43 @@ async def delete_user(user_id: str, current_user: Dict = Depends(get_current_use
     await log_audit(current_user['id'], current_user['email'], 'DELETE', 'user', user_id)
     return {"message": "User deactivated"}
 
+@api_router.delete("/users/{user_id}/permanent")
+async def delete_user_permanent(user_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete a user (admin only)"""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    # Prevent admin from deleting themselves
+    if user_id == current_user['id']:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    await db.users.delete_one({"id": user_id})
+    await log_audit(current_user['id'], current_user['email'], 'PERMANENT_DELETE', 'user', user_id, old_values=user)
+    return {"message": "User permanently deleted"}
+
+@api_router.put("/users/{user_id}/reset-password")
+async def admin_reset_password(user_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Admin can reset any user's password"""
+    if current_user['role'] != 'admin':
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    new_password = data.get('new_password')
+    if not new_password or len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_hash = hash_password(new_password)
+    await db.users.update_one({"id": user_id}, {"$set": {"password_hash": new_hash}})
+    await log_audit(current_user['id'], current_user['email'], 'RESET_PASSWORD', 'user', user_id)
+    return {"message": "Password reset successfully"}
+
 # ==================== GENERIC CRUD HELPER ====================
 async def crud_list(collection: str, filters: Dict = None):
     query = filters or {}

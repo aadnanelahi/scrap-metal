@@ -45,6 +45,8 @@ export const usersAPI = {
   create: (data) => api.post('/users', data),
   update: (id, data) => api.put(`/users/${id}`, data),
   delete: (id) => api.delete(`/users/${id}`),
+  deletePermanent: (id) => api.delete(`/users/${id}/permanent`),
+  resetPassword: (id, newPassword) => api.put(`/users/${id}/reset-password`, { new_password: newPassword }),
 };
 
 // Companies

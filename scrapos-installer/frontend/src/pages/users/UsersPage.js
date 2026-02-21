@@ -7,20 +7,27 @@ import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Users, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Loader2, Key, AlertTriangle } from 'lucide-react';
 
 export default function UsersPage() {
-  const { hasRole } = useAuth();
+  const { hasRole, user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [editing, setEditing] = useState(null);
   const [formData, setFormData] = useState({
     full_name: '', email: '', password: '', role: 'viewer'
   });
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -60,9 +67,80 @@ export default function UsersPage() {
     }
   };
 
-  const handleEdit = (user) => { setEditing(user); setFormData({ ...user, password: '' }); setShowDialog(true); };
-  const handleDelete = async (id) => { if (!window.confirm('Deactivate this user?')) return; try { await usersAPI.delete(id); toast.success('User deactivated'); loadData(); } catch (error) { toast.error('Failed to delete'); } };
-  const resetForm = () => { setEditing(null); setFormData({ full_name: '', email: '', password: '', role: 'viewer' }); };
+  const handleEdit = (user) => { 
+    setEditing(user); 
+    setFormData({ ...user, password: '' }); 
+    setShowDialog(true); 
+  };
+
+  const handleDeactivate = async (id) => { 
+    if (!window.confirm('Deactivate this user?')) return; 
+    try { 
+      await usersAPI.delete(id); 
+      toast.success('User deactivated'); 
+      loadData(); 
+    } catch (error) { 
+      toast.error('Failed to deactivate'); 
+    } 
+  };
+
+  const handleDeletePermanent = async () => {
+    if (!selectedUser) return;
+    setDeleting(true);
+    try {
+      await usersAPI.deletePermanent(selectedUser.id);
+      toast.success('User permanently deleted');
+      setShowDeleteDialog(false);
+      setSelectedUser(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser) return;
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      await usersAPI.resetPassword(selectedUser.id, newPassword);
+      toast.success(`Password reset for ${selectedUser.full_name}`);
+      setShowPasswordDialog(false);
+      setSelectedUser(null);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reset password');
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
+  const openPasswordDialog = (user) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPasswordDialog(true);
+  };
+
+  const openDeleteDialog = (user) => {
+    setSelectedUser(user);
+    setShowDeleteDialog(true);
+  };
+
+  const resetForm = () => { 
+    setEditing(null); 
+    setFormData({ full_name: '', email: '', password: '', role: 'viewer' }); 
+  };
 
   const getRoleBadgeClass = (role) => {
     const classes = { admin: 'status-cancelled', manager: 'status-posted', accountant: 'status-active', weighbridge_operator: 'status-pending', sales: 'status-active', purchase: 'status-active', viewer: 'status-draft' };
@@ -107,6 +185,7 @@ export default function UsersPage() {
           </Dialog>
         )}
       </div>
+
       <div className="kpi-card p-0 overflow-hidden">
         <table className="erp-table" data-testid="users-table">
           <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Status</th><th>Actions</th></tr></thead>
@@ -123,9 +202,22 @@ export default function UsersPage() {
                   <td><Badge className={u.is_active ? 'status-active' : 'status-cancelled'}>{u.is_active ? 'Active' : 'Inactive'}</Badge></td>
                   <td>
                     {hasRole(['admin', 'manager']) && (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(u)}><Edit2 className="w-4 h-4" /></Button>
-                        {hasRole('admin') && <Button size="sm" variant="ghost" onClick={() => handleDelete(u.id)} className="text-red-500"><Trash2 className="w-4 h-4" /></Button>}
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(u)} title="Edit User">
+                          <Edit2 className="w-4 h-4" />
+                        </Button>
+                        {hasRole('admin') && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => openPasswordDialog(u)} title="Reset Password" className="text-blue-500">
+                              <Key className="w-4 h-4" />
+                            </Button>
+                            {u.id !== currentUser?.id && (
+                              <Button size="sm" variant="ghost" onClick={() => openDeleteDialog(u)} title="Delete User" className="text-red-500">
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </>
+                        )}
                       </div>
                     )}
                   </td>
@@ -135,6 +227,77 @@ export default function UsersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-manrope flex items-center gap-2">
+              <Key className="w-5 h-5 text-blue-500" />
+              Reset Password
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              Reset password for <span className="font-semibold">{selectedUser?.full_name}</span> ({selectedUser?.email})
+            </p>
+            <div>
+              <Label className="form-label">New Password</Label>
+              <Input 
+                type="password" 
+                value={newPassword} 
+                onChange={(e) => setNewPassword(e.target.value)} 
+                className="form-input" 
+                placeholder="Enter new password (min 6 characters)"
+              />
+            </div>
+            <div>
+              <Label className="form-label">Confirm Password</Label>
+              <Input 
+                type="password" 
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)} 
+                className="form-input" 
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>Cancel</Button>
+            <Button onClick={handleResetPassword} disabled={resettingPassword} className="btn-accent">
+              {resettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reset Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-manrope flex items-center gap-2 text-red-500">
+              <AlertTriangle className="w-5 h-5" />
+              Delete User Permanently
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+              <p className="text-sm text-red-600 dark:text-red-400">
+                You are about to permanently delete the user <span className="font-semibold">{selectedUser?.full_name}</span> ({selectedUser?.email}).
+              </p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2">
+                This action cannot be undone. All data associated with this user will be lost.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>Cancel</Button>
+            <Button onClick={handleDeletePermanent} disabled={deleting} variant="destructive">
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete Permanently'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
