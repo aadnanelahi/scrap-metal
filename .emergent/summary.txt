@@ -3,81 +3,66 @@ The user initially requested a production-ready, commercial ERP system for Scrap
 
 **PRODUCT REQUIREMENTS (based on user choices):**
 -   **Core ERP System:**
-    -   Authentication: JWT-based custom auth (email/password).
-    -   Modules: Master Data, Purchases (Local/Intl), Sales (Local/Export), Weighbridge, Inventory, Finance, Reports.
-    -   AI/Reporting: Manual reports with export to PDF/XLSX.
+    -   Authentication: JWT-based custom auth (email/password), with admin-only user management.
+    -   Modules: Master Data (Companies module admin-only), Purchases, Sales, Weighbridge, Inventory, Finance, Reports.
+    -   AI/Reporting: Manual reports with export to PDF/XLSX. A Trial Balance report is required.
     -   Theme: Dark and Light theme support.
-    -   Admin: Full data backup, restore, and reset functionality.
+    -   Admin: Full data backup, restore, reset, and scheduled backup functionality.
+    -   Branding: Ability to add a company logo and slogan for use on printed documents. The app should also feature TechSight Innovation branding.
 -   **Deployment:**
     -   A single, self-installing package ( script) for easy deployment on an Ubuntu 24.04 server.
-    -   The setup should be for a LAN/VPN access scenario, using an IP address, with MongoDB installed locally on the same server.
+    -   The setup should be for a LAN/VPN access scenario (fully offline), using an IP address, with MongoDB installed locally on the same server.
 
 **User's preferred language**: English
 
 **what currently exists?**
--   A full-featured ERP application with a FastAPI backend and React frontend. Most core features like CRUD for transactions, reporting, exports, and document printing are implemented.
--   An admin-only Data Management section for backup, restore, and system reset has been built.
--   A shell script () has been created. This script is intended to automate the entire installation process on a fresh Ubuntu server, including setting up dependencies, the database, and the application services.
+- A full-featured ERP application with a FastAPI backend and React frontend.
+- A self-installing offline package () has been created, which includes an  script to automate setup on Ubuntu.
+- Key features implemented include: most core modules, PDF/Excel reporting, data management (manual backup/restore), company logo/slogan on prints, offline mode, custom branding, admin user management (password reset/delete), role-based sidebar/route access, and dashboard date filters.
+- The frontend and backend for a Trial Balance Report have been added.
+- A UI for Scheduled Backups has been added to the Data Management page, but the backend logic is not implemented.
 
 **Last working item**:
-    - Last item agent was working: The agent was creating a self-installing package to resolve the user's persistent and numerous difficulties with manually setting up the application on their local Ubuntu server. An  script was created to automate the entire process.
+    - Last item agent was working: The agent was implementing two features requested by the user: P1: Trial Balance Report and P2: Scheduled Backups. The agent created the full-stack code for the Trial Balance report and added the UI for Scheduled Backups.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? manual testing by curl/ python -c. The next agent needs to review the  script for correctness, package it with the source code into a downloadable archive (e.g., a  file), and provide the download link and instructions to the user.
+    - Which testing method agent to use? both. Use the frontend testing agent to verify the new  and the UI additions on . Use the backend testing agent to test the new  endpoint.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: User is unable to deploy the application on their local Ubuntu server. (Priority: P0)
-
-  Issues Detail:
-  - Issue 1: 
-     - **Description**: The user, who is non-technical, has repeatedly failed to follow the manual installation guide, encountering a series of errors related to MongoDB repositories, Python virtual environments, missing dependencies (To use the fastapi command, please install "fastapi[standard]":
-
-	pip install "fastapi[standard]", ), and  configuration.
-     - **Attempted fixes**: The agent provided step-by-step debugging instructions for each error. After multiple failures, the agent changed strategy and created an automated installer script ().
-     - **Next debug checklist**:
-        1.  Review the created  for completeness and correctness. Ensure it handles all dependencies (system and application), environment setup, and service configuration.
-        2.  Create a single downloadable archive (e.g., ) that contains both the application source code (, ) and the  script.
-        3.  Provide clear, simple instructions for the user to download, extract, and run the installer script.
-     - **Why fix this issue and what will be achieved with the fix?**: This is an absolute blocker for the user. Solving it will finally allow the user to run the ERP application they've requested in their own environment.
-     - **Status**:  IN PROGRESS
-     - **Is recurring issue?**: Y
-     - **Should Test frontend/backend/both after fix?**: Not applicable. The fix is a deployment script for the user's environment.
-     - **Blocked on other issue**: None
+  There are no pending user-reported issues. All previously reported bugs (inventory error, backup failure) have been resolved.
 
 **In progress Task List**:
-  - Task 1: Finalize and Deliver the Self-Installing ERP Package (Priority: P0)
-     - **Where to resume**: The  script has been created at .
-     - **What will be achieved with this?**: The user will receive a single package to easily install the entire application, solving all their previous deployment issues.
-     - **Status**: IN PROGRESS
-     - **Should Test frontend/backend/both after fix?**: NA
+  - Task 1: Complete and Test P1 & P2 tasks (Trial Balance & Scheduled Backups) (Priority: P0)
+
+  Task Detail:
+  - Task 1: 
+     - **Where to resume**:
+        1.  **Trial Balance (P1):** The code is implemented but untested. The next agent must test the functionality by navigating to the Trial Balance report page and verifying that it displays correct data. Key files are  () and .
+        2.  **Scheduled Backups (P2):** The UI has been added to , but it is non-functional. The next agent must implement the backend logic. This involves creating new API endpoints to save/load the schedule and a mechanism on the server to run the backup task periodically (e.g., using a  job configured by the  script or a Python library like ).
+     - **What will be achieved with this?**: The Trial Balance report will be verified as functional, and the Scheduled Backup feature will be fully implemented, allowing users to automate database backups.
+     - **Status**:  IN PROGRESS
+     - **Should Test frontend/backend/both after fix?**: both
      - **Blocked on something**: No.
 
 **Upcoming and Future Tasks**
 - **Upcoming Tasks:**
-    - **P1: Implement Trial Balance Report:** Build the backend endpoint and frontend page for the Trial Balance report as per the PRD.
-    - **P2: Add Scheduled/Automated Backups:** Enhance the backup feature to allow for automated, scheduled backups (e.g., nightly), potentially with email notifications.
-    - **P2: Add International Suppliers/Customers to Seed Data:** As suggested by the agent, add sample international parties to the seed data so the international trade forms can be tested immediately after a fresh install.
+    - **P2: Add International Suppliers/Customers to Seed Data:** Add sample international parties to the seed data so the international trade forms can be tested immediately after a fresh install.
 - **Future Tasks:**
     - **P2: Implement SaaS Tenancy:** Architect and implement multi-tenant data separation.
     - **P3: Weighbridge Hardware Integration:** Implement the API placeholder for physical weighbridge hardware.
-    - **P3: Make App Fully Offline:** Download external resources (Google Fonts) and serve them locally.
 
 **Completed work in this session**
-- **P0 Bug Fix**: Fixed the critical bug where transaction creation forms (, , etc.) crashed when master data was not present.
-- **International Trade Forms**: Implemented the New International Purchase and New Export Sale forms, replacing the Coming Soon placeholders.
-- **Document Printing**: Added print functionality to Purchase Orders, Sales Orders, and Weighbridge Slips.
-- **Reporting Enhancements**:
-    - Implemented PDF and Excel export functionality for all existing reports (Purchase Register, Sales Register, VAT Report, Stock Aging, etc.).
-    - Created new Party Ledger (Customer/Supplier) reports.
-- **Finance & Admin Features**:
-    - Implemented a Payments page to manage receipts and payments.
-    - Implemented document cancellation logic on the backend and added Cancel buttons to detail pages.
-    - Created an admin-only Data Management page for database backup, restore, and reset.
-- **User Deployment Support**:
-    - Created a comprehensive PDF installation guide for Ubuntu.
-    - Diagnosed and provided solutions for numerous user-reported local installation errors (MongoDB version,  package, , Python virtual environment issues).
-    - Created an automated installation script () to simplify the process.
+- **Deployment Package:** Created and iteratively improved a self-installing package () containing the source code, an installer script (), a backend environment template (), and a  guide.
+- **Feature: Company Logo & Slogan:** Implemented functionality for users to upload a company logo and set a slogan, which now appear on printed documents (POs, SOs, etc.).
+- **Feature: Offline Mode:** Made the application fully self-contained by downloading Google Fonts and modifying the frontend to serve them locally, removing all external network dependencies.
+- **Feature: Admin User Management:** Added functionality for admins to reset any user's password and permanently delete user accounts from the Users page.
+- **Feature: Dashboard Date Filters:** Added date range filters (Today, This Week, Monthly, Custom, etc.) to the main dashboard.
+- **Feature: Role-Based Access Control:** Restricted access to the Users and Companies modules to admin users only, hiding the links and protecting the routes for other roles.
+- **Feature: Custom Branding:** Added Developed by TechSight Innovation branding and logo to the login page and sidebar.
+- **Bug Fix: Inventory & Journal Page Crash:** Fixed a frontend crash on the Inventory and Journal Entries pages caused by passing an empty string value to a  component.
+- **Bug Fix: Backup Failure:** Resolved a critical bug where the backup process would fail due to a Pydantic validation error when logging the audit trail.
+- **Installer Fix:** Corrected the installation process after user feedback, ensuring the backend  file is created correctly.
 
 **Earlier issues found/mentioned but not fixed**
    - None.
@@ -92,83 +77,101 @@ The user initially requested a production-ready, commercial ERP system for Scrap
 - **Frontend:** React, React Router, TailwindCSS, shadcn/ui, Axios
 - **Backend:** FastAPI, Motor, JWT
 - **Database:** MongoDB
-- **Deployment (User's Target):** Ubuntu 24.04, PM2, Nginx (as reverse proxy in install script), Bash scripting.
+- **Deployment (User's Target):** Ubuntu 24.04, PM2, Nginx, Bash scripting.
+- **Scheduling (Needed):** A job scheduler for the backend (e.g., ) or system-level scheduling (e.g., ).
 
 **key DB schema**
-- New collections are implicitly used by endpoints: , , . Schemas are defined by Pydantic models in .
+- **companies**: Schema updated to include  (Base64) and .
+- **users**:  field is now critical for frontend access control.
+- **journal_entries**: This collection is the source for the new Trial Balance report.
 
 **changes in tech stack**
-  - None for the core application.  and  were introduced for the user's local deployment.
+- No changes.  or a similar library might be added to  to implement scheduled backups.
 
 **All files of reference**
-- ****: The newly created automated installer script. This is the most critical file for the next step.
-- ****: Heavily modified to include new endpoints for reports, ledgers, payments, cancellation, and data management.
-- ****: Updated with routes for all new pages.
-- ****: Sidebar updated with links to new pages and role-based visibility.
-- ****: New utility for report exports.
-- ****: The latest version of the manual installation guide.
+- : Contains new endpoints for Trial Balance, dashboard filters, admin password reset/delete, and the backup fix.
+- : Updated with a non-functional UI for scheduled backups.
+- : The new, untested frontend for the Trial Balance report.
+- : Updated with date filter UI and logic.
+- : Updated with UI and logic for new admin actions.
+- : Contains updated logic for role-based navigation.
+- [0;34m
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║   ███████╗ ██████╗██████╗  █████╗ ██████╗  ██████╗ ███████╗║
+║   ██╔════╝██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔═══██╗██╔════╝║
+║   ███████╗██║     ██████╔╝███████║██████╔╝██║   ██║███████╗║
+║   ╚════██║██║     ██╔══██╗██╔══██║██╔═══╝ ██║   ██║╚════██║║
+║   ███████║╚██████╗██║  ██║██║  ██║██║     ╚██████╔╝███████║║
+║   ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝      ╚═════╝ ╚══════╝║
+║                                                           ║
+║           ERP System - One Click Installer                ║
+║                    Version 1.1                            ║
+╚═══════════════════════════════════════════════════════════╝
+[0m
+[1;33mThis script will install ScrapOS ERP on your Ubuntu server.[0m
+
+[0;31m╔═══════════════════════════════════════════════════════════╗[0m
+[0;31m║  ERROR: Do NOT run this script as root!                   ║[0m
+[0;31m║                                                           ║[0m
+[0;31m║  Run as normal user: ./install.sh                         ║[0m
+[0;31m║  (NOT: sudo ./install.sh)                                 ║[0m
+[0;31m╚═══════════════════════════════════════════════════════════╝[0m: The master installation script.
 
 **Areas that need refactoring**:
-- **Backend Monolith:** The  file has grown significantly and is now over 2400 lines. It is critical to break it down into modular  files (e.g., , ) for maintainability.
+- **Backend Monolith:** The  file is critically large and complex. It should be broken down into modular  files (e.g., , ) to improve maintainability.
+- **Scheduled Backups Backend**: The entire backend for this feature needs to be designed and built. The current UI on  is just a placeholder.
 
 **key api endpoints**
-- : Creates and returns a backup of the database.
-- : Restores the database from an uploaded backup file.
-- : Clears all transactional data.
-- : Create a new payment/receipt.
-- : Get ledger data for a customer/supplier.
-- : Cancel a local purchase order.
-- : Cancel a local sales order.
+- **GET **: (New) Generates data for the Trial Balance report.
+- **PUT **: (New) Allows an admin to set a new password for a user.
+- **DELETE **: (New) Allows an admin to permanently delete a user.
+- **GET **: (Updated) Now accepts  and  query parameters.
+- **POST **: (Fixed) The backup functionality is now working correctly.
 
 **Critical Info for New Agent**
-- The user is non-technical and extremely frustrated with the manual installation process. Do not offer any more manual debugging steps.
-- Your immediate and only priority is to finalize the automated installation package.
-- Package the entire  directory (or at least  and ) along with the  into a single downloadable archive ( or ).
-- Provide the user with a download link and a very simple set of commands: , , .
-- The  script is the key to success. Double-check it before packaging.
+- Your first priority is to complete the two features from the previous session: Trial Balance and Scheduled Backups.
+- The Trial Balance report is likely complete but **must be tested**.
+- The Scheduled Backup feature requires a full backend implementation. You will need to design a solution for running periodic tasks, such as integrating  into the FastAPI app or using the  script to create a system  job that calls a backup script.
+- After implementing and testing these features, you **must** update the distributable package by copying the updated  and  directories into the  folder and then re-creating the  archive.
+- All instructions for the user must be kept extremely simple, as they are non-technical.
 
 **documents and test reports created in this job**
-- 
-- 
-- 
-- 
-- 
-- 
-- 
+- The agent continuously updated the installer package located at .
+-  was updated.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **Request:** compile this complete erp...make it one simple installation pakage - The user is fed up with manual steps and wants a fully automated installer.
-2.  **Error:**  - User ran  using the system's Python, not the virtual environment's.
-3.  **Error:**  - User had a typo in the uvicorn command.
-4.  **Error:**  - User was not inside the activated virtual environment.
-5.  **Problem:**  shows only frontend, no backend. Login fails. - Backend service is not running.
-6.  **Problem:** Can't log in (id password error). - User tried to log in to an empty database without registering first.
-7.  **Error:**  - Uvicorn failed to install in the venv.
-8.  **Error:**  - The Python virtual environment was not set up correctly.
-9.  **Error:**  - The pm2 config file had a syntax error.
-10. **Error:**  - User tried to install a platform-specific package locally.
+1.  **Request:** P1: Trial Balance Report P2: Scheduled backups - User requests the implementation of these two features.
+2.  **Request:** now update that only admin have users and companies module access other than any users cant see that - User requests role-based access control.
+3.  **Request:** at dashboard trading overviews operation add date selection button ,weekly , monthly , quterly , yearly or custom - User requests date filters for the dashboard.
+4.  **Request:** in user managment admin can change passowrd and can delete user completely for any user update it - User requests admin powers for user management.
+5.  **Bug Report:** when i click backup i shows backup failed check and resolve the issue - User reports that the backup feature is broken.
+6.  **Request:** add my company name and logo under scrapOS name is techsight innovation - User requests custom branding.
+7.  **Bug Report:** journal-entries error fix it - User reports an error on the journal entries page.
+8.  **Bug Report:** inventory module have error please clear it and purchase items posted is not reflecting in inventory - User reports an error on the inventory page.
+9.  **Request:** make complete offline mode and give link to download it - User requests the application be made fully offline.
+10. **Request:** i need to add company logo when i am adding company with its slogan and this logo will appear and in print also - User requests company logo/slogan feature.
 
 **Project Health Check:**
 - **Broken**:
-    - The user's local deployment is completely broken. This is not a code issue but a setup/environment issue.
+    - The Scheduled Backups feature is non-functional as it lacks a backend implementation.
 - **Mocked**:
-    - Trial Balance report.
-    - Some advanced finance features (currency revaluation).
+    - None.
 
 **3rd Party Integrations**
 - None.
 
 **Testing status**
-  - Testing agent used after significant changes: YES (Last run after implementing reports/finance features, achieved 100% success).
+  - Testing agent used after significant changes: NO (in the most recent session)
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: []
-  - Known regressions: None in the application code.
+  - Known regressions: None
 
 **Credentials to test flow:**
-- User can register a new account (e.g., email: , password: ).
-- Or seed the database () and use:
-    - **Email:** 
-    - **Password:** 
+- After seeding the database ():
+    - **Admin Email:**  / **Password:** 
+    - **Viewer Email:**  / **Password:** 
 
 **What agent forgot to execute**
-- The agent created the  script as requested but did not take the final step to package it along with the application source code into a downloadable archive for the user. The job ended before this crucial delivery step was completed.</analysis>
+- The agent did not implement the backend logic for the Scheduled Backups feature, leaving it as a UI-only mockup.
+- The agent did not test the Trial Balance Report feature after implementing it.</analysis>

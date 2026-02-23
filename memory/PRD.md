@@ -191,7 +191,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ## Deployment Package (February 2026) ✅ COMPLETE - v2.0 OFFLINE
 
 ### Self-Installing OFFLINE Package Created
-- **Download URL**: `https://scrapos-one-click.preview.emergentagent.com/scrapos-erp-offline.tar.gz`
+- **Download URL**: `https://scrapos-erp-preview.preview.emergentagent.com/scrapos-erp-offline.tar.gz`
 - **Package Size**: ~2.0MB (includes all fonts for offline use)
 - **Target OS**: Ubuntu 22.04 / 24.04 LTS
 - **Version**: 2.0 (Complete Offline Mode)
