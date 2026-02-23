@@ -2949,6 +2949,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_scheduler():
+    """Initialize scheduler on startup"""
+    scheduler.start()
+    # Load existing schedule from database
+    settings = await db.system_settings.find_one({"type": "backup_schedule"}, {"_id": 0})
+    if settings and settings.get("enabled"):
+        schedule_backup_job(settings.get("frequency", "daily"), settings.get("time", "02:00"))
+    logger.info("Scheduler initialized")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    scheduler.shutdown(wait=False)
     client.close()
