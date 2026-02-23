@@ -2108,6 +2108,88 @@ async def supplier_ledger(
         "closing_balance": total_credit - total_debit
     }
 
+@api_router.get("/reports/trial-balance")
+async def trial_balance_report(
+    as_of_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Trial Balance Report showing all account balances"""
+    
+    # Get all accounts
+    accounts = await db.accounts.find({}, {"_id": 0}).sort("code", 1).to_list(1000)
+    
+    # Build date filter for journal entries
+    je_filter = {}
+    if as_of_date:
+        je_filter["entry_date"] = {"$lte": as_of_date}
+    
+    # Get all journal entries
+    journal_entries = await db.journal_entries.find(je_filter, {"_id": 0}).to_list(10000)
+    
+    # Calculate balances for each account from journal entry lines
+    account_balances = {}
+    
+    for entry in journal_entries:
+        for line in entry.get('lines', []):
+            account_code = line.get('account_code', '')
+            debit = line.get('debit', 0) or 0
+            credit = line.get('credit', 0) or 0
+            
+            if account_code not in account_balances:
+                account_balances[account_code] = {'debit': 0, 'credit': 0}
+            
+            account_balances[account_code]['debit'] += debit
+            account_balances[account_code]['credit'] += credit
+    
+    # Build trial balance rows
+    trial_balance = []
+    total_debit = 0
+    total_credit = 0
+    
+    for account in accounts:
+        code = account.get('code', '')
+        balance_data = account_balances.get(code, {'debit': 0, 'credit': 0})
+        
+        debit_total = balance_data['debit']
+        credit_total = balance_data['credit']
+        
+        # Calculate net balance based on account type
+        account_type = account.get('type', '').lower()
+        
+        # Assets and Expenses normally have debit balances
+        # Liabilities, Equity, and Revenue normally have credit balances
+        if account_type in ['asset', 'expense']:
+            net_debit = max(0, debit_total - credit_total)
+            net_credit = max(0, credit_total - debit_total)
+        else:  # liability, equity, revenue
+            net_credit = max(0, credit_total - debit_total)
+            net_debit = max(0, debit_total - credit_total)
+        
+        # Only include accounts with non-zero balances or all accounts
+        trial_balance.append({
+            "account_code": code,
+            "account_name": account.get('name', ''),
+            "account_type": account.get('type', ''),
+            "debit": round(net_debit, 2),
+            "credit": round(net_credit, 2)
+        })
+        
+        total_debit += net_debit
+        total_credit += net_credit
+    
+    # Check if balanced
+    is_balanced = abs(total_debit - total_credit) < 0.01
+    
+    return {
+        "as_of_date": as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "accounts": trial_balance,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
+        "difference": round(total_debit - total_credit, 2),
+        "is_balanced": is_balanced
+    }
+
 # ==================== PAYMENTS ====================
 @api_router.get("/payments", response_model=List[Dict])
 async def list_payments(
