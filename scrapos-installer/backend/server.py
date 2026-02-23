@@ -14,6 +14,9 @@ import jwt
 import bcrypt
 from decimal import Decimal
 from enum import Enum
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -31,6 +34,11 @@ JWT_EXPIRATION_HOURS = 24
 app = FastAPI(title="ScrapOS ERP API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
+
+# APScheduler for scheduled backups
+scheduler = AsyncIOScheduler()
+BACKUP_DIR = Path(__file__).parent / "backups"
+BACKUP_DIR.mkdir(exist_ok=True)
 
 # ==================== ENUMS ====================
 class UserRole(str, Enum):
@@ -2108,6 +2116,88 @@ async def supplier_ledger(
         "closing_balance": total_credit - total_debit
     }
 
+@api_router.get("/reports/trial-balance")
+async def trial_balance_report(
+    as_of_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Trial Balance Report showing all account balances"""
+    
+    # Get all accounts
+    accounts = await db.accounts.find({}, {"_id": 0}).sort("code", 1).to_list(1000)
+    
+    # Build date filter for journal entries
+    je_filter = {}
+    if as_of_date:
+        je_filter["entry_date"] = {"$lte": as_of_date}
+    
+    # Get all journal entries
+    journal_entries = await db.journal_entries.find(je_filter, {"_id": 0}).to_list(10000)
+    
+    # Calculate balances for each account from journal entry lines
+    account_balances = {}
+    
+    for entry in journal_entries:
+        for line in entry.get('lines', []):
+            account_code = line.get('account_code', '')
+            debit = line.get('debit', 0) or 0
+            credit = line.get('credit', 0) or 0
+            
+            if account_code not in account_balances:
+                account_balances[account_code] = {'debit': 0, 'credit': 0}
+            
+            account_balances[account_code]['debit'] += debit
+            account_balances[account_code]['credit'] += credit
+    
+    # Build trial balance rows
+    trial_balance = []
+    total_debit = 0
+    total_credit = 0
+    
+    for account in accounts:
+        code = account.get('code', '')
+        balance_data = account_balances.get(code, {'debit': 0, 'credit': 0})
+        
+        debit_total = balance_data['debit']
+        credit_total = balance_data['credit']
+        
+        # Calculate net balance based on account type
+        account_type = account.get('type', '').lower()
+        
+        # Assets and Expenses normally have debit balances
+        # Liabilities, Equity, and Revenue normally have credit balances
+        if account_type in ['asset', 'expense']:
+            net_debit = max(0, debit_total - credit_total)
+            net_credit = max(0, credit_total - debit_total)
+        else:  # liability, equity, revenue
+            net_credit = max(0, credit_total - debit_total)
+            net_debit = max(0, debit_total - credit_total)
+        
+        # Only include accounts with non-zero balances or all accounts
+        trial_balance.append({
+            "account_code": code,
+            "account_name": account.get('name', ''),
+            "account_type": account.get('type', ''),
+            "debit": round(net_debit, 2),
+            "credit": round(net_credit, 2)
+        })
+        
+        total_debit += net_debit
+        total_credit += net_credit
+    
+    # Check if balanced
+    is_balanced = abs(total_debit - total_credit) < 0.01
+    
+    return {
+        "as_of_date": as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "accounts": trial_balance,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
+        "difference": round(total_debit - total_credit, 2),
+        "is_balanced": is_balanced
+    }
+
 # ==================== PAYMENTS ====================
 @api_router.get("/payments", response_model=List[Dict])
 async def list_payments(
@@ -2513,6 +2603,180 @@ async def get_system_stats(current_user: Dict = Depends(get_current_user)):
         "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
+# ==================== SCHEDULED BACKUPS ====================
+async def execute_scheduled_backup():
+    """Execute a scheduled backup and save to disk"""
+    import json
+    try:
+        backup_data = {
+            "metadata": {
+                "version": "1.0",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": "scheduled_backup",
+                "collections": BACKUP_COLLECTIONS
+            },
+            "data": {}
+        }
+        
+        for collection_name in BACKUP_COLLECTIONS:
+            collection = db[collection_name]
+            documents = await collection.find({}, {"_id": 0}).to_list(None)
+            backup_data["data"][collection_name] = documents
+        
+        # Save backup to file
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        backup_file = BACKUP_DIR / f"scheduled_backup_{timestamp}.json"
+        with open(backup_file, 'w') as f:
+            json.dump(backup_data, f, indent=2, default=str)
+        
+        # Log the backup
+        record_counts = {col: len(backup_data["data"].get(col, [])) for col in BACKUP_COLLECTIONS}
+        
+        # Record backup in database
+        backup_record = {
+            "id": str(uuid.uuid4()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "file_path": str(backup_file),
+            "record_counts": record_counts,
+            "total_records": sum(record_counts.values())
+        }
+        await db.backup_history.insert_one(backup_record)
+        
+        # Clean up old backups (keep last 10)
+        old_backups = sorted(BACKUP_DIR.glob("scheduled_backup_*.json"), reverse=True)[10:]
+        for old_file in old_backups:
+            old_file.unlink()
+        
+        logging.info(f"Scheduled backup completed: {backup_file}")
+        return True
+    except Exception as e:
+        # Log failure
+        backup_record = {
+            "id": str(uuid.uuid4()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "failed",
+            "error": str(e)
+        }
+        await db.backup_history.insert_one(backup_record)
+        logging.error(f"Scheduled backup failed: {e}")
+        return False
+
+def schedule_backup_job(frequency: str, time_str: str):
+    """Schedule or reschedule the backup job"""
+    job_id = "scheduled_backup"
+    
+    # Remove existing job if any
+    if scheduler.get_job(job_id):
+        scheduler.remove_job(job_id)
+    
+    hour, minute = map(int, time_str.split(':'))
+    
+    if frequency == 'daily':
+        trigger = CronTrigger(hour=hour, minute=minute)
+    elif frequency == 'weekly':
+        trigger = CronTrigger(day_of_week='mon', hour=hour, minute=minute)
+    elif frequency == 'monthly':
+        trigger = CronTrigger(day=1, hour=hour, minute=minute)
+    else:
+        return
+    
+    scheduler.add_job(
+        execute_scheduled_backup,
+        trigger,
+        id=job_id,
+        replace_existing=True
+    )
+    logging.info(f"Scheduled backup job configured: {frequency} at {time_str}")
+
+@api_router.get("/admin/backup-schedule")
+async def get_backup_schedule(current_user: Dict = Depends(get_current_user)):
+    """Get the current backup schedule settings"""
+    require_admin(current_user)
+    
+    settings = await db.system_settings.find_one({"type": "backup_schedule"}, {"_id": 0})
+    if not settings:
+        settings = {
+            "enabled": False,
+            "frequency": "daily",
+            "time": "02:00"
+        }
+    
+    # Get backup history
+    history = await db.backup_history.find({}, {"_id": 0}).sort("created_at", -1).to_list(10)
+    
+    return {
+        "enabled": settings.get("enabled", False),
+        "frequency": settings.get("frequency", "daily"),
+        "time": settings.get("time", "02:00"),
+        "last_backup": history[0] if history else None,
+        "history": history
+    }
+
+@api_router.post("/admin/backup-schedule")
+async def save_backup_schedule(
+    schedule: Dict,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Save backup schedule settings"""
+    require_admin(current_user)
+    
+    enabled = schedule.get("enabled", False)
+    frequency = schedule.get("frequency", "daily")
+    time_str = schedule.get("time", "02:00")
+    
+    # Validate frequency
+    if frequency not in ['daily', 'weekly', 'monthly']:
+        raise HTTPException(status_code=400, detail="Invalid frequency. Must be daily, weekly, or monthly")
+    
+    # Validate time format
+    try:
+        hour, minute = map(int, time_str.split(':'))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+    
+    # Save settings
+    await db.system_settings.update_one(
+        {"type": "backup_schedule"},
+        {"$set": {
+            "type": "backup_schedule",
+            "enabled": enabled,
+            "frequency": frequency,
+            "time": time_str,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user['email']
+        }},
+        upsert=True
+    )
+    
+    # Update scheduler
+    if enabled:
+        schedule_backup_job(frequency, time_str)
+    else:
+        if scheduler.get_job("scheduled_backup"):
+            scheduler.remove_job("scheduled_backup")
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'backup_schedule', None, None, {
+        "enabled": enabled,
+        "frequency": frequency,
+        "time": time_str
+    })
+    
+    return {"message": "Backup schedule saved successfully", "enabled": enabled}
+
+@api_router.post("/admin/backup-now")
+async def run_backup_now(current_user: Dict = Depends(get_current_user)):
+    """Trigger an immediate scheduled backup"""
+    require_admin(current_user)
+    
+    success = await execute_scheduled_backup()
+    if success:
+        return {"message": "Backup completed successfully", "status": "success"}
+    else:
+        raise HTTPException(status_code=500, detail="Backup failed")
+
 # ==================== SEED DATA ====================
 @api_router.post("/seed-data")
 async def seed_data(current_user: Dict = Depends(get_current_user)):
@@ -2685,6 +2949,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_scheduler():
+    """Initialize scheduler on startup"""
+    scheduler.start()
+    # Load existing schedule from database
+    settings = await db.system_settings.find_one({"type": "backup_schedule"}, {"_id": 0})
+    if settings and settings.get("enabled"):
+        schedule_backup_job(settings.get("frequency", "daily"), settings.get("time", "02:00"))
+    logger.info("Scheduler initialized")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    scheduler.shutdown(wait=False)
     client.close()
