@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { companiesAPI } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { formatDate } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -10,6 +12,8 @@ import { toast } from 'sonner';
 import { Plus, Edit2, Trash2, Building2, Loader2, Upload, X } from 'lucide-react';
 
 export default function CompaniesPage() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -21,7 +25,15 @@ export default function CompaniesPage() {
   const [logoPreview, setLogoPreview] = useState(null);
   const fileInputRef = useRef(null);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    // Check admin access
+    if (user && user.role !== 'admin') {
+      toast.error('Access denied. Admin only.');
+      navigate('/');
+      return;
+    }
+    loadData();
+  }, [user, navigate]);
 
   const loadData = async () => {
     try {
