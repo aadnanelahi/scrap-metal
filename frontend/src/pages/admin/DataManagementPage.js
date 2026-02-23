@@ -358,9 +358,14 @@ export default function DataManagementPage() {
                 {backupHistory.slice(0, 5).map((backup, idx) => (
                   <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
                     <span>{formatDateTime(backup.created_at)}</span>
-                    <span className={`text-xs ${backup.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {backup.status}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      {backup.total_records && (
+                        <span className="text-xs text-slate-500">{backup.total_records} records</span>
+                      )}
+                      <span className={`text-xs font-medium ${backup.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {backup.status}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>
