@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usersAPI } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { formatDateTime } from '../../lib/utils';
@@ -9,9 +10,10 @@ import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Users, Loader2, Key, AlertTriangle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, Loader2, Key, AlertTriangle, ShieldAlert } from 'lucide-react';
 
 export default function UsersPage() {
+  const navigate = useNavigate();
   const { hasRole, user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,15 @@ export default function UsersPage() {
   const [deleting, setDeleting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    // Check admin access
+    if (currentUser && currentUser.role !== 'admin') {
+      toast.error('Access denied. Admin only.');
+      navigate('/');
+      return;
+    }
+    loadData();
+  }, [currentUser, navigate]);
 
   const loadData = async () => {
     try {
