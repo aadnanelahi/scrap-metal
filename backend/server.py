@@ -2149,23 +2149,24 @@ async def trial_balance_report(
     if as_of_date:
         je_filter["entry_date"] = {"$lte": as_of_date}
     
-    # Get all journal entries
-    journal_entries = await db.journal_entries.find(je_filter, {"_id": 0}).to_list(10000)
+    # Calculate balances using aggregation pipeline (much more efficient)
+    balance_pipeline = [
+        {"$match": je_filter},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_code",
+            "debit": {"$sum": {"$ifNull": ["$lines.debit", 0]}},
+            "credit": {"$sum": {"$ifNull": ["$lines.credit", 0]}}
+        }}
+    ]
     
-    # Calculate balances for each account from journal entry lines
-    account_balances = {}
+    balance_results = await db.journal_entries.aggregate(balance_pipeline).to_list(1000)
     
-    for entry in journal_entries:
-        for line in entry.get('lines', []):
-            account_code = line.get('account_code', '')
-            debit = line.get('debit', 0) or 0
-            credit = line.get('credit', 0) or 0
-            
-            if account_code not in account_balances:
-                account_balances[account_code] = {'debit': 0, 'credit': 0}
-            
-            account_balances[account_code]['debit'] += debit
-            account_balances[account_code]['credit'] += credit
+    # Convert to dictionary for quick lookup
+    account_balances = {
+        result["_id"]: {"debit": result["debit"], "credit": result["credit"]}
+        for result in balance_results
+    }
     
     # Build trial balance rows
     trial_balance = []
