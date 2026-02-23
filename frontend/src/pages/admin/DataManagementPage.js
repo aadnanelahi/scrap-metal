@@ -22,6 +22,7 @@ export default function DataManagementPage() {
   const [restoring, setRestoring] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [runningScheduledBackup, setRunningScheduledBackup] = useState(false);
   
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
