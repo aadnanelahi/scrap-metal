@@ -9,6 +9,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **Database**: MongoDB with proper collections for each entity
 - **Authentication**: JWT-based with bcrypt password hashing
 - **Theme**: Dark/Light mode with theme toggle
+- **Scheduling**: APScheduler for automated tasks (backups)
 
 ## Implemented Features (v1.0) - February 2026
 
@@ -17,6 +18,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - JWT-based login/logout
 - Role-based access control (Admin, Manager, Accountant, Weighbridge Operator, Sales, Purchase, Viewer)
 - Audit logging (who did what & when)
+- Admin-only user management (password reset, delete user)
 
 ### ✅ Master Data
 - Companies CRUD (with **Logo upload** and **Slogan/Tagline** support)
@@ -40,19 +42,19 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Weight slip number generation (WB-YYYYMM-XXXX)
 - Lock functionality after posting
 - Vehicle & driver tracking
-- **Print weighbridge slips** ✨ NEW
+- Print weighbridge slips
 
 ### ✅ Purchase Modules (Fully Segregated)
 - **Local Purchases**: PO creation, VAT calculation, broker commission, inventory update, accounting posting
-- **International Purchases**: Multi-currency, landed cost, shipping details, incoterms ✨ NEW FORM
-- **Print Purchase Orders** ✨ NEW
-- **Purchase Order Detail View** ✨ NEW
+- **International Purchases**: Multi-currency, landed cost, shipping details, incoterms
+- Print Purchase Orders
+- Purchase Order Detail View
 
 ### ✅ Sales Modules (Fully Segregated)
 - **Local Sales**: SO creation, VAT calculation, broker commission, inventory reduction, COGS calculation
-- **Export Sales**: Zero-rated VAT, incoterms, container details, multi-currency ✨ NEW FORM
-- **Print Sales Orders** ✨ NEW
-- **Sales Order Detail View** ✨ NEW
+- **Export Sales**: Zero-rated VAT, incoterms, container details, multi-currency
+- Print Sales Orders
+- Sales Order Detail View
 
 ### ✅ Inventory Module
 - Real-time stock by Item & Yard
@@ -64,8 +66,9 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Chart of Accounts (pre-seeded)
 - Automatic journal entry creation on posting
 - VAT Input/Output tracking
-- **Payments Page** ✨ NEW - Receipts from customers & payments to suppliers
-- **Payment Receipt Printing** ✨ NEW
+- Payments Page - Receipts from customers & payments to suppliers
+- Payment Receipt Printing
+- **Trial Balance Report** ✨ NEW (Feb 2026)
 
 ### ✅ Reports
 - Purchase Register (Local & Intl separate)
@@ -73,23 +76,25 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - VAT Report (UAE FTA format)
 - Stock Aging
 - Broker Commission Report
-- **Customer Ledger** ✨ NEW
-- **Supplier Ledger** ✨ NEW
-- **PDF/Excel Export** ✨ NEW - All reports exportable
+- Customer Ledger
+- Supplier Ledger
+- **Trial Balance** ✨ NEW - Shows all account balances with debit/credit totals
+- PDF/Excel Export - All reports exportable
 
 ### ✅ Admin Features
-- User management
+- User management (admin can reset passwords, delete users)
 - Audit logs
-- **Data Management** ✨ NEW (Admin only)
+- **Data Management** (Admin only)
   - Complete database backup (JSON export)
   - Restore from backup file
   - Reset system data with options to preserve users/master data
   - Database statistics view
-
-### ✅ Document Management
-- **Document Cancellation** ✨ NEW - Cancel PO/SO with automatic reversal entries
-- Cancellation reason tracking
-- Audit trail for all cancellations
+  - **Scheduled Backups** ✨ NEW (Feb 2026)
+    - Daily/Weekly/Monthly automatic backups
+    - APScheduler-based scheduling
+    - Server-side backup files (/app/backend/backups/)
+    - Backup history with record counts
+    - Run Now manual trigger
 
 ### ✅ Dashboard
 - KPIs: Total Purchases, Sales, Gross Margin, Inventory Value
@@ -97,51 +102,26 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Pending documents summary
 - Top inventory items chart
 - Quick action links
+- **Date Filters**: Today, This Week, Monthly, Custom date range
 
-### ✅ UAE Seed Data
-- UAE VAT codes (5%, 0%, Exempt)
-- Currencies (AED, USD, EUR, INR)
-- Payment Terms (Cash, Net 15/30/60)
-- Incoterms (EXW, FOB, CFR, CIF, DAP)
-- UAE & International Ports
-- Scrap Categories (Ferrous, Non-Ferrous, Stainless, Mixed)
-- Common Scrap Items (HMS, Shredded, Copper, Aluminum, Brass, SS304/316)
-- Chart of Accounts
+### ✅ Role-Based Access
+- Admin-only access to Users and Companies modules
+- Non-admin users see restricted sidebar menu
 
-## User Personas
-1. **Admin**: Full system access, user management, seed data
-2. **Manager**: All operations, reports, approvals
-3. **Accountant**: Finance, VAT reports, journal entries
-4. **Weighbridge Operator**: Weighbridge entry only
-5. **Sales**: Sales orders, customers
-6. **Purchase**: Purchase orders, suppliers
-7. **Viewer**: Read-only access
+### ✅ Custom Branding
+- TechSight Innovation branding on login page and sidebar
 
-## Core Requirements (Static)
-- Local & International must remain fully segregated
-- Weighbridge is source of truth for weight
-- Posted documents cannot be edited (cancel via reversal)
-- VAT amounts locked after invoice
-- Multi-company & multi-branch ready
-- SaaS-ready tenant separation architecture
-
-## Recent Changes (February 2026)
-
-### Bug Fixes ✅
-- **P0 Fixed**: Transaction creation forms no longer crash when master data is empty
-- Forms now show helpful "Master Data Required" message instead of crashing
-- Weighbridge page handles empty branches/weighbridges gracefully
-- Fixed Broker Commission SelectItem empty value bug
+## Recent Changes (February 23, 2026)
 
 ### New Features ✅
-- **Document Printing**: Print functionality for all documents (PO, SO, Weighbridge Slips)
-- **Detail Pages**: View Purchase Order and Sales Order details with print option
-- **Print Templates**: Professional print layout with company header, signatures
-- **PDF/Excel Export**: All reports exportable to PDF and Excel ✨
-- **Payments Page**: Receipts & Payment Vouchers with print ✨
-- **Party Ledger**: Customer & Supplier account statements ✨
-- **Document Cancellation**: Cancel PO/SO with reversal entries ✨
-- **Company Logo & Slogan**: Upload company logo and tagline - appears on all printed documents (PO, SO, Weighbridge Slips, Payment Receipts) ✨ NEW
+- **Trial Balance Report**: Shows all account balances with debit/credit totals, balanced status indicator, and PDF/Excel export
+- **Scheduled Backups**: APScheduler-based automated backups with daily/weekly/monthly frequency, server-side storage, backup history, and manual "Run Now" trigger
+
+### API Endpoints Added
+- `GET /api/reports/trial-balance` - Generate trial balance report with date filter
+- `GET /api/admin/backup-schedule` - Get backup schedule settings and history
+- `POST /api/admin/backup-schedule` - Save backup schedule (enable/disable, frequency, time)
+- `POST /api/admin/backup-now` - Trigger immediate backup
 
 ## Prioritized Backlog
 
@@ -154,95 +134,56 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] Payment Receipt printing
 - [x] Customer/Supplier ledger reports
 - [x] Document cancellation/reversal flow
+- [x] Trial Balance Report
+- [x] Scheduled Backups
 
 ### P1 - High Priority (Next Sprint)
+- [ ] Add international suppliers/customers to seed data
 - [ ] Weighbridge hardware API integration placeholder
-- [ ] Trial balance report
 - [ ] Currency revaluation
 - [ ] Bank reconciliation
+
+### P2 - Medium Priority
+- [ ] Break down server.py into modular routers (refactoring)
+- [ ] SaaS multi-tenancy architecture
 
 ### P3 - Low Priority
 - [ ] Dashboard monthly charts with real data
 - [ ] Container/BL tracking for exports
 - [ ] AI-powered insights (architecture ready)
 - [ ] Email notifications
-- [ ] Multi-tenant SaaS mode
 
-## Technical Decisions
-- MongoDB for flexible document schema
-- JWT with 24h expiration
-- CORS configured for all origins (configure for production)
-- All monetary values in base currency (AED) with conversion
-- UTC timestamps throughout
+## Deployment Package (February 2026) ✅ v2.1 OFFLINE
 
-## API Endpoints Summary
-- `/api/auth/*` - Authentication
-- `/api/users/*` - User management
-- `/api/companies/*`, `/api/branches/*`, etc. - Master data
-- `/api/weighbridge-entries/*` - Weighbridge operations
-- `/api/local-purchases/*`, `/api/intl-purchases/*` - Purchases
-- `/api/local-sales/*`, `/api/export-sales/*` - Sales
-- `/api/inventory/*` - Stock & movements
-- `/api/accounts/*`, `/api/journal-entries/*` - Finance
-- `/api/reports/*` - All reports
-- `/api/dashboard/*` - Dashboard KPIs
-- `/api/audit-logs` - Audit trail
-
-## Deployment Package (February 2026) ✅ COMPLETE - v2.0 OFFLINE
-
-### Self-Installing OFFLINE Package Created
+### Self-Installing OFFLINE Package
 - **Download URL**: `https://scrapos-erp-preview.preview.emergentagent.com/scrapos-erp-offline.tar.gz`
-- **Package Size**: ~2.0MB (includes all fonts for offline use)
+- **Package Size**: ~2.9MB (includes all fonts and latest features)
 - **Target OS**: Ubuntu 22.04 / 24.04 LTS
-- **Version**: 2.0 (Complete Offline Mode)
+- **Version**: 2.1 (with Trial Balance & Scheduled Backups)
 
-### Offline Mode Features
-- ✅ All fonts bundled locally (Inter, Manrope, JetBrains Mono)
-- ✅ No Google Fonts CDN dependency
-- ✅ No external scripts or resources required
-- ✅ Works on isolated LAN/VPN networks
-- ✅ Perfect for factories/yards without internet
-
-### Installation Script (`install.sh`) Features
+### Installation Script Features
 - Fully automated installation (no manual steps)
 - Installs all dependencies: Node.js 20, Python 3, MongoDB 8.0, PM2
-- Creates Python virtual environment with all packages
-- Automatically creates .env files for both backend and frontend
+- Creates Python virtual environment with APScheduler
+- Automatically creates .env files
 - Generates secure JWT secret
 - Configures firewall (UFW)
-- Sets up PM2 process manager for auto-restart
-- Creates logs directory at /opt/scrapos/logs/
+- Sets up PM2 process manager
 - Creates default admin user
 - Seeds sample data
-
-### Package Contents
-- `install.sh` - Main installer script
-- `INSTALLATION_GUIDE.txt` - Step-by-step guide for non-IT users
-- `README.txt` - Quick reference
-- `backend/` - FastAPI application
-- `frontend/` - React application
-- `frontend/public/fonts/` - Local font files (Inter, Manrope, JetBrains Mono)
 
 ### Default Credentials After Install
 - **Email**: admin@scrapos.local
 - **Password**: Admin@123
 
-### File Locations After Install
-- Application: `/opt/scrapos/`
-- Backend: `/opt/scrapos/backend/`
-- Frontend: `/opt/scrapos/frontend/`
-- Logs: `/opt/scrapos/logs/`
-- PM2 Config: `/opt/scrapos/ecosystem.config.js`
-- Local Fonts: `/opt/scrapos/frontend/build/fonts/`
+## Technical Stack
+- MongoDB for flexible document schema
+- JWT with 24h expiration
+- APScheduler for scheduled tasks
+- FastAPI async routes
+- All monetary values in base currency (AED) with conversion
+- UTC timestamps throughout
 
-## Next Action Items
-1. Implement Trial Balance report
-2. Add scheduled/automated backups feature
-3. Add international suppliers/customers to seed data
-4. Break down server.py into modular routers (refactoring)
-
-## Future/Backlog
-- SaaS multi-tenancy architecture
-- Weighbridge hardware integration
-- Offline mode (local fonts)
-- AI-powered business insights
+## Test Credentials (Preview Environment)
+- **Admin**: admin@scrapos.ae / password
+- **Viewer**: viewer@test.com / password
