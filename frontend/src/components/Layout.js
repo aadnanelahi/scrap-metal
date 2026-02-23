@@ -160,6 +160,16 @@ export const Layout = ({ children }) => {
     }
 
     if (hasChildren) {
+      // Filter out admin-only children for non-admin users
+      const visibleChildren = item.children.filter(
+        child => !child.adminOnly || user?.role === 'admin'
+      );
+      
+      // If no visible children, don't show the parent
+      if (visibleChildren.length === 0) {
+        return null;
+      }
+      
       return (
         <div>
           <button
@@ -175,7 +185,7 @@ export const Layout = ({ children }) => {
           </button>
           {isExpanded && (
             <div className="ml-8 mt-1 space-y-1">
-              {item.children.map((child) => (
+              {visibleChildren.map((child) => (
                 <Link
                   key={child.path}
                   to={child.path}
