@@ -5,12 +5,13 @@ import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
 import { Switch } from '../../components/ui/switch';
 import { Input } from '../../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import api from '../../lib/api';
 import { 
   Download, Upload, RotateCcw, Database, Loader2, Shield, 
-  AlertTriangle, CheckCircle, HardDrive, RefreshCw 
+  AlertTriangle, CheckCircle, HardDrive, RefreshCw, Clock, Calendar, Save
 } from 'lucide-react';
 
 export default function DataManagementPage() {
@@ -20,6 +21,7 @@ export default function DataManagementPage() {
   const [backing, setBacking] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
   
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
@@ -29,10 +31,18 @@ export default function DataManagementPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [restorePreview, setRestorePreview] = useState(null);
   
+  // Scheduled backup settings
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduleFrequency, setScheduleFrequency] = useState('daily');
+  const [scheduleTime, setScheduleTime] = useState('02:00');
+  const [lastScheduledBackup, setLastScheduledBackup] = useState(null);
+  const [backupHistory, setBackupHistory] = useState([]);
+  
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadStats();
+    loadScheduleSettings();
   }, []);
 
   const loadStats = async () => {
@@ -43,6 +53,38 @@ export default function DataManagementPage() {
       toast.error('Failed to load statistics');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadScheduleSettings = async () => {
+    try {
+      const res = await api.get('/admin/backup-schedule');
+      if (res.data) {
+        setScheduleEnabled(res.data.enabled || false);
+        setScheduleFrequency(res.data.frequency || 'daily');
+        setScheduleTime(res.data.time || '02:00');
+        setLastScheduledBackup(res.data.last_backup);
+        setBackupHistory(res.data.history || []);
+      }
+    } catch (error) {
+      // Settings might not exist yet, that's okay
+      console.log('No backup schedule settings found');
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    setSavingSchedule(true);
+    try {
+      await api.post('/admin/backup-schedule', {
+        enabled: scheduleEnabled,
+        frequency: scheduleFrequency,
+        time: scheduleTime
+      });
+      toast.success('Backup schedule saved');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to save schedule');
+    } finally {
+      setSavingSchedule(false);
     }
   };
 
@@ -64,6 +106,7 @@ export default function DataManagementPage() {
       URL.revokeObjectURL(url);
       
       toast.success('Backup created successfully');
+      loadScheduleSettings(); // Refresh to show new backup in history
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Backup failed');
     } finally {
@@ -163,6 +206,25 @@ export default function DataManagementPage() {
     );
   }
 
+  const getNextBackupTime = () => {
+    const now = new Date();
+    const [hours, minutes] = scheduleTime.split(':').map(Number);
+    let next = new Date(now);
+    next.setHours(hours, minutes, 0, 0);
+    
+    if (next <= now) {
+      if (scheduleFrequency === 'daily') {
+        next.setDate(next.getDate() + 1);
+      } else if (scheduleFrequency === 'weekly') {
+        next.setDate(next.getDate() + 7);
+      } else if (scheduleFrequency === 'monthly') {
+        next.setMonth(next.getMonth() + 1);
+      }
+    }
+    
+    return next.toLocaleString();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in" data-testid="data-management-page">
       <div className="flex items-center justify-between">
@@ -197,6 +259,86 @@ export default function DataManagementPage() {
         <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <span className="text-slate-500">Total Records</span>
           <span className="text-2xl font-mono font-bold">{stats?.total_records || 0}</span>
+        </div>
+      </div>
+
+      {/* Scheduled Backups */}
+      <div className="kpi-card border-purple-200 dark:border-purple-800">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-purple-500" />
+            <h3 className="fieldset-legend mb-0 border-0 pb-0">Scheduled Backups</h3>
+          </div>
+          <Switch
+            checked={scheduleEnabled}
+            onCheckedChange={setScheduleEnabled}
+            data-testid="schedule-toggle"
+          />
+        </div>
+        
+        <div className={`space-y-4 ${!scheduleEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label className="text-sm mb-2 block">Frequency</Label>
+              <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
+                <SelectTrigger data-testid="schedule-frequency">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm mb-2 block">Time</Label>
+              <Input
+                type="time"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
+                data-testid="schedule-time"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button 
+                onClick={handleSaveSchedule} 
+                disabled={savingSchedule}
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                data-testid="save-schedule-btn"
+              >
+                {savingSchedule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                Save Schedule
+              </Button>
+            </div>
+          </div>
+          
+          {scheduleEnabled && (
+            <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-sm">
+              <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                <Calendar className="w-4 h-4" />
+                <span className="text-sm">
+                  Next backup: <strong>{getNextBackupTime()}</strong>
+                </span>
+              </div>
+            </div>
+          )}
+          
+          {backupHistory.length > 0 && (
+            <div className="mt-4">
+              <Label className="text-sm mb-2 block">Recent Backups</Label>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {backupHistory.slice(0, 5).map((backup, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
+                    <span>{formatDateTime(backup.created_at)}</span>
+                    <span className={`text-xs ${backup.status === 'success' ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {backup.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -394,7 +536,7 @@ export default function DataManagementPage() {
           <div className="py-4 space-y-4">
             <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-sm border border-red-200 dark:border-red-800">
               <p className="text-sm text-red-700 dark:text-red-400 font-medium">
-                ⚠️ This will permanently delete transaction data including:
+                This will permanently delete transaction data including:
               </p>
               <ul className="mt-2 text-sm text-red-600 dark:text-red-500 list-disc list-inside">
                 <li>All purchase orders and sales orders</li>
