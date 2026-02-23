@@ -1702,24 +1702,38 @@ async def get_dashboard_kpis(
     if date_filter:
         sales_filter["order_date"] = date_filter
     
-    # Total purchases (local + intl)
-    local_purchases = await db.local_purchases.find(purchase_filter, {"_id": 0}).to_list(1000)
-    intl_purchases = await db.intl_purchases.find(purchase_filter, {"_id": 0}).to_list(1000)
+    # Total purchases using aggregation (local + intl)
+    local_purchase_agg = await db.local_purchases.aggregate([
+        {"$match": purchase_filter},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+    ]).to_list(1)
+    intl_purchase_agg = await db.intl_purchases.aggregate([
+        {"$match": purchase_filter},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+    ]).to_list(1)
     
-    total_purchases = sum(p.get('total_amount', 0) for p in local_purchases) + \
-                     sum(p.get('total_amount', 0) for p in intl_purchases)
+    total_purchases = (local_purchase_agg[0]["total"] if local_purchase_agg else 0) + \
+                     (intl_purchase_agg[0]["total"] if intl_purchase_agg else 0)
     
-    # Total sales (local + export)
-    local_sales = await db.local_sales.find(sales_filter, {"_id": 0}).to_list(1000)
-    export_sales = await db.export_sales.find(sales_filter, {"_id": 0}).to_list(1000)
+    # Total sales using aggregation (local + export)
+    local_sales_agg = await db.local_sales.aggregate([
+        {"$match": sales_filter},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+    ]).to_list(1)
+    export_sales_agg = await db.export_sales.aggregate([
+        {"$match": sales_filter},
+        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+    ]).to_list(1)
     
-    total_sales = sum(s.get('total_amount', 0) for s in local_sales) + \
-                 sum(s.get('total_amount', 0) for s in export_sales)
+    total_sales = (local_sales_agg[0]["total"] if local_sales_agg else 0) + \
+                 (export_sales_agg[0]["total"] if export_sales_agg else 0)
     
-    # Total inventory value (not filtered by date - current snapshot)
-    inventory = await db.inventory_stock.find({}, {"_id": 0}).to_list(1000)
-    inventory_value = sum(i.get('total_value', 0) for i in inventory)
-    inventory_qty = sum(i.get('quantity', 0) for i in inventory)
+    # Total inventory value using aggregation (not filtered by date - current snapshot)
+    inventory_agg = await db.inventory_stock.aggregate([
+        {"$group": {"_id": None, "total_value": {"$sum": "$total_value"}, "total_qty": {"$sum": "$quantity"}}}
+    ]).to_list(1)
+    inventory_value = inventory_agg[0]["total_value"] if inventory_agg else 0
+    inventory_qty = inventory_agg[0]["total_qty"] if inventory_agg else 0
     
     # Gross margin
     gross_margin = total_sales - total_purchases
