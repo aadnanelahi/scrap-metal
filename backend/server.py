@@ -2603,6 +2603,180 @@ async def get_system_stats(current_user: Dict = Depends(get_current_user)):
         "generated_at": datetime.now(timezone.utc).isoformat()
     }
 
+# ==================== SCHEDULED BACKUPS ====================
+async def execute_scheduled_backup():
+    """Execute a scheduled backup and save to disk"""
+    import json
+    try:
+        backup_data = {
+            "metadata": {
+                "version": "1.0",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_by": "scheduled_backup",
+                "collections": BACKUP_COLLECTIONS
+            },
+            "data": {}
+        }
+        
+        for collection_name in BACKUP_COLLECTIONS:
+            collection = db[collection_name]
+            documents = await collection.find({}, {"_id": 0}).to_list(None)
+            backup_data["data"][collection_name] = documents
+        
+        # Save backup to file
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        backup_file = BACKUP_DIR / f"scheduled_backup_{timestamp}.json"
+        with open(backup_file, 'w') as f:
+            json.dump(backup_data, f, indent=2, default=str)
+        
+        # Log the backup
+        record_counts = {col: len(backup_data["data"].get(col, [])) for col in BACKUP_COLLECTIONS}
+        
+        # Record backup in database
+        backup_record = {
+            "id": str(uuid.uuid4()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "success",
+            "file_path": str(backup_file),
+            "record_counts": record_counts,
+            "total_records": sum(record_counts.values())
+        }
+        await db.backup_history.insert_one(backup_record)
+        
+        # Clean up old backups (keep last 10)
+        old_backups = sorted(BACKUP_DIR.glob("scheduled_backup_*.json"), reverse=True)[10:]
+        for old_file in old_backups:
+            old_file.unlink()
+        
+        logging.info(f"Scheduled backup completed: {backup_file}")
+        return True
+    except Exception as e:
+        # Log failure
+        backup_record = {
+            "id": str(uuid.uuid4()),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "status": "failed",
+            "error": str(e)
+        }
+        await db.backup_history.insert_one(backup_record)
+        logging.error(f"Scheduled backup failed: {e}")
+        return False
+
+def schedule_backup_job(frequency: str, time_str: str):
+    """Schedule or reschedule the backup job"""
+    job_id = "scheduled_backup"
+    
+    # Remove existing job if any
+    if scheduler.get_job(job_id):
+        scheduler.remove_job(job_id)
+    
+    hour, minute = map(int, time_str.split(':'))
+    
+    if frequency == 'daily':
+        trigger = CronTrigger(hour=hour, minute=minute)
+    elif frequency == 'weekly':
+        trigger = CronTrigger(day_of_week='mon', hour=hour, minute=minute)
+    elif frequency == 'monthly':
+        trigger = CronTrigger(day=1, hour=hour, minute=minute)
+    else:
+        return
+    
+    scheduler.add_job(
+        execute_scheduled_backup,
+        trigger,
+        id=job_id,
+        replace_existing=True
+    )
+    logging.info(f"Scheduled backup job configured: {frequency} at {time_str}")
+
+@api_router.get("/admin/backup-schedule")
+async def get_backup_schedule(current_user: Dict = Depends(get_current_user)):
+    """Get the current backup schedule settings"""
+    require_admin(current_user)
+    
+    settings = await db.system_settings.find_one({"type": "backup_schedule"}, {"_id": 0})
+    if not settings:
+        settings = {
+            "enabled": False,
+            "frequency": "daily",
+            "time": "02:00"
+        }
+    
+    # Get backup history
+    history = await db.backup_history.find({}, {"_id": 0}).sort("created_at", -1).to_list(10)
+    
+    return {
+        "enabled": settings.get("enabled", False),
+        "frequency": settings.get("frequency", "daily"),
+        "time": settings.get("time", "02:00"),
+        "last_backup": history[0] if history else None,
+        "history": history
+    }
+
+@api_router.post("/admin/backup-schedule")
+async def save_backup_schedule(
+    schedule: Dict,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Save backup schedule settings"""
+    require_admin(current_user)
+    
+    enabled = schedule.get("enabled", False)
+    frequency = schedule.get("frequency", "daily")
+    time_str = schedule.get("time", "02:00")
+    
+    # Validate frequency
+    if frequency not in ['daily', 'weekly', 'monthly']:
+        raise HTTPException(status_code=400, detail="Invalid frequency. Must be daily, weekly, or monthly")
+    
+    # Validate time format
+    try:
+        hour, minute = map(int, time_str.split(':'))
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError()
+    except:
+        raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+    
+    # Save settings
+    await db.system_settings.update_one(
+        {"type": "backup_schedule"},
+        {"$set": {
+            "type": "backup_schedule",
+            "enabled": enabled,
+            "frequency": frequency,
+            "time": time_str,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": current_user['email']
+        }},
+        upsert=True
+    )
+    
+    # Update scheduler
+    if enabled:
+        schedule_backup_job(frequency, time_str)
+    else:
+        if scheduler.get_job("scheduled_backup"):
+            scheduler.remove_job("scheduled_backup")
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'backup_schedule', None, None, {
+        "enabled": enabled,
+        "frequency": frequency,
+        "time": time_str
+    })
+    
+    return {"message": "Backup schedule saved successfully", "enabled": enabled}
+
+@api_router.post("/admin/backup-now")
+async def run_backup_now(current_user: Dict = Depends(get_current_user)):
+    """Trigger an immediate scheduled backup"""
+    require_admin(current_user)
+    
+    success = await execute_scheduled_backup()
+    if success:
+        return {"message": "Backup completed successfully", "status": "success"}
+    else:
+        raise HTTPException(status_code=500, detail="Backup failed")
+
 # ==================== SEED DATA ====================
 @api_router.post("/seed-data")
 async def seed_data(current_user: Dict = Depends(get_current_user)):
