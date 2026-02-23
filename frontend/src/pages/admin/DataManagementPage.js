@@ -82,10 +82,24 @@ export default function DataManagementPage() {
         time: scheduleTime
       });
       toast.success('Backup schedule saved');
+      loadScheduleSettings();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to save schedule');
     } finally {
       setSavingSchedule(false);
+    }
+  };
+
+  const handleRunScheduledBackup = async () => {
+    setRunningScheduledBackup(true);
+    try {
+      await api.post('/admin/backup-now');
+      toast.success('Scheduled backup completed successfully');
+      loadScheduleSettings();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Scheduled backup failed');
+    } finally {
+      setRunningScheduledBackup(false);
     }
   };
 
