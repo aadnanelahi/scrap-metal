@@ -291,8 +291,26 @@ export default function DataManagementPage() {
           />
         </div>
         
+        {/* Run Now button always accessible */}
+        <div className="flex items-center justify-between mb-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-sm">
+          <div>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Manual Server Backup</p>
+            <p className="text-xs text-slate-500">Creates a backup file stored on the server</p>
+          </div>
+          <Button 
+            onClick={handleRunScheduledBackup} 
+            disabled={runningScheduledBackup}
+            variant="outline"
+            className="border-purple-300 text-purple-600 hover:bg-purple-50"
+            data-testid="run-backup-now-btn"
+          >
+            {runningScheduledBackup ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Run Now
+          </Button>
+        </div>
+
         <div className={`space-y-4 ${!scheduleEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <Label className="text-sm mb-2 block">Frequency</Label>
               <Select value={scheduleFrequency} onValueChange={setScheduleFrequency}>
@@ -324,18 +342,6 @@ export default function DataManagementPage() {
               >
                 {savingSchedule ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
                 Save Schedule
-              </Button>
-            </div>
-            <div className="flex items-end">
-              <Button 
-                onClick={handleRunScheduledBackup} 
-                disabled={runningScheduledBackup}
-                variant="outline"
-                className="w-full border-purple-300 text-purple-600 hover:bg-purple-50"
-                data-testid="run-backup-now-btn"
-              >
-                {runningScheduledBackup ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                Run Now
               </Button>
             </div>
           </div>
