@@ -243,6 +243,7 @@ export const reportsAPI = {
   vatReport: (params) => api.get('/reports/vat-report', { params }),
   stockAging: () => api.get('/reports/stock-aging'),
   brokerCommission: (params) => api.get('/reports/broker-commission', { params }),
+  trialBalance: (params) => api.get('/reports/trial-balance', { params }),
 };
 
 // Seed Data

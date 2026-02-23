@@ -105,6 +105,7 @@ const navItems = [
       { title: 'Stock Aging', path: '/reports/stock-aging' },
       { title: 'Broker Commission', path: '/reports/broker-commission' },
       { title: 'Party Ledger', path: '/reports/party-ledger' },
+      { title: 'Trial Balance', path: '/reports/trial-balance' },
     ],
   },
   {

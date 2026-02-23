@@ -52,6 +52,7 @@ import VATReportPage from './pages/reports/VATReportPage';
 import StockAgingPage from './pages/reports/StockAgingPage';
 import BrokerCommissionPage from './pages/reports/BrokerCommissionPage';
 import PartyLedgerPage from './pages/reports/PartyLedgerPage';
+import TrialBalancePage from './pages/reports/TrialBalancePage';
 
 // Admin
 import UsersPage from './pages/users/UsersPage';
@@ -144,6 +145,7 @@ function AppRoutes() {
       <Route path="/reports/stock-aging" element={<ProtectedRoute><StockAgingPage /></ProtectedRoute>} />
       <Route path="/reports/broker-commission" element={<ProtectedRoute><BrokerCommissionPage /></ProtectedRoute>} />
       <Route path="/reports/party-ledger" element={<ProtectedRoute><PartyLedgerPage /></ProtectedRoute>} />
+      <Route path="/reports/trial-balance" element={<ProtectedRoute><TrialBalancePage /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/users" element={<ProtectedRoute><UsersPage /></ProtectedRoute>} />
