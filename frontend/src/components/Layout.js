@@ -74,7 +74,7 @@ const navItems = [
     title: 'Master Data',
     icon: Boxes,
     children: [
-      { title: 'Companies', path: '/companies' },
+      { title: 'Companies', path: '/companies', adminOnly: true },
       { title: 'Branches / Yards', path: '/branches' },
       { title: 'Customers', path: '/customers' },
       { title: 'Suppliers', path: '/suppliers' },
@@ -111,6 +111,7 @@ const navItems = [
     title: 'Users',
     icon: Users,
     path: '/users',
+    adminOnly: true,
   },
   {
     title: 'Audit Logs',
