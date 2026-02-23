@@ -35,6 +35,11 @@ app = FastAPI(title="ScrapOS ERP API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
 security = HTTPBearer()
 
+# APScheduler for scheduled backups
+scheduler = AsyncIOScheduler()
+BACKUP_DIR = Path(__file__).parent / "backups"
+BACKUP_DIR.mkdir(exist_ok=True)
+
 # ==================== ENUMS ====================
 class UserRole(str, Enum):
     ADMIN = "admin"
