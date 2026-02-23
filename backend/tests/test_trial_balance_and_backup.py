@@ -29,8 +29,9 @@ class TestAuth:
         })
         assert response.status_code == 200, f"Admin login failed: {response.text}"
         data = response.json()
-        assert "token" in data
-        return data["token"]
+        # API returns access_token
+        assert "access_token" in data, f"No access_token in response: {data}"
+        return data["access_token"]
 
 
 class TestTrialBalanceAPI(TestAuth):
