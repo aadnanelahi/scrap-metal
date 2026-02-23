@@ -19,7 +19,7 @@ from apscheduler.triggers.cron import CronTrigger
 import asyncio
 
 ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+load_dotenv(ROOT_DIR / '.env', override=False)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -627,8 +627,12 @@ async def change_password(data: PasswordChange, current_user: Dict = Depends(get
 
 # ==================== USERS MANAGEMENT ====================
 @api_router.get("/users", response_model=List[Dict])
-async def list_users(current_user: Dict = Depends(get_current_user)):
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+async def list_users(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: Dict = Depends(get_current_user)
+):
+    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
     return users
 
 @api_router.post("/users", response_model=Dict)
@@ -714,9 +718,9 @@ async def admin_reset_password(user_id: str, data: Dict, current_user: Dict = De
     return {"message": "Password reset successfully"}
 
 # ==================== GENERIC CRUD HELPER ====================
-async def crud_list(collection: str, filters: Dict = None):
+async def crud_list(collection: str, filters: Dict = None, limit: int = 500):
     query = filters or {}
-    items = await db[collection].find(query, {"_id": 0}).to_list(1000)
+    items = await db[collection].find(query, {"_id": 0}).limit(limit).to_list(limit)
     return items
 
 async def crud_get(collection: str, item_id: str):
