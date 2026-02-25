@@ -287,6 +287,25 @@ export const generatePOPrintHTML = (po, company = null) => {
     
     ${po.notes ? `<div style="margin-top:20px;"><strong>Notes:</strong> ${po.notes}</div>` : ''}
     
+    ${po.status === 'cancelled' && po.cancellation_reason ? `
+    <div style="margin-top:20px;padding:15px;background:#fef2f2;border:1px solid #fecaca;border-radius:4px;">
+      <p style="color:#dc2626;font-weight:600;margin:0 0 5px 0;">CANCELLED</p>
+      <p style="margin:0;color:#991b1b;"><strong>Reason:</strong> ${po.cancellation_reason}</p>
+      ${po.cancelled_by ? `<p style="margin:5px 0 0 0;font-size:11px;color:#991b1b;">Cancelled by: ${po.cancelled_by} on ${formatDate(po.cancelled_at)}</p>` : ''}
+    </div>
+    ` : ''}
+    
+    ${po.edit_history && po.edit_history.length > 0 ? `
+    <div style="margin-top:20px;padding:15px;background:#fef9c3;border:1px solid #fde047;border-radius:4px;">
+      <p style="color:#a16207;font-weight:600;margin:0 0 10px 0;">EDIT HISTORY (Post-Posting Modifications)</p>
+      ${po.edit_history.map(edit => `
+        <p style="margin:5px 0;font-size:11px;color:#a16207;">
+          <strong>${formatDate(edit.edited_at)}</strong> by ${edit.edited_by}: ${edit.reason}
+        </p>
+      `).join('')}
+    </div>
+    ` : ''}
+    
     <div class="footer">
       <div class="signature-line">
         <hr />
