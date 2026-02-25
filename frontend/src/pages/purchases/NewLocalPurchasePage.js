@@ -9,11 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { toast } from 'sonner';
 import { ArrowLeft, Plus, Trash2, Loader2, Save, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 
 export default function NewLocalPurchasePage() {
   const navigate = useNavigate();
-  const { id } = useParams(); // For edit mode
+  const { id } = useParams();
   const isEditMode = !!id;
+  const { user } = useAuth();
   
   const [companies, setCompanies] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -23,6 +26,9 @@ export default function NewLocalPurchasePage() {
   const [brokers, setBrokers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [existingStatus, setExistingStatus] = useState('draft');
+  const [editReasonDialogOpen, setEditReasonDialogOpen] = useState(false);
+  const [editReason, setEditReason] = useState('');
 
   const [formData, setFormData] = useState({
     company_id: '',
