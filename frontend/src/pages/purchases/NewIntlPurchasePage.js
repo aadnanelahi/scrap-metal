@@ -71,11 +71,38 @@ export default function NewIntlPurchasePage() {
       setPorts(portRes.data || []);
       setCurrencies(currRes.data || []);
 
-      if (compRes.data?.length > 0) {
-        setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
-      }
-      if (branchRes.data?.length > 0) {
-        setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+      if (isEditMode) {
+        const poRes = await intlPurchasesAPI.get(id);
+        const po = poRes.data;
+        setFormData({
+          company_id: po.company_id || '',
+          branch_id: po.branch_id || '',
+          supplier_id: po.supplier_id || '',
+          supplier_name: po.supplier_name || '',
+          order_date: po.order_date || toISODateString(new Date()),
+          expected_date: po.expected_date || '',
+          currency: po.currency || 'USD',
+          exchange_rate: po.exchange_rate || 3.67,
+          incoterm_id: po.incoterm_id || '',
+          port_of_loading_id: po.port_of_loading_id || '',
+          port_of_destination_id: po.port_of_destination_id || '',
+          shipping_line: po.shipping_line || '',
+          container_number: po.container_number || '',
+          bl_number: po.bl_number || '',
+          freight_cost: po.freight_cost || 0,
+          insurance_cost: po.insurance_cost || 0,
+          customs_duty: po.customs_duty || 0,
+          other_costs: po.other_costs || 0,
+          notes: po.notes || '',
+          lines: po.lines || []
+        });
+      } else {
+        if (compRes.data?.length > 0) {
+          setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
+        }
+        if (branchRes.data?.length > 0) {
+          setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+        }
       }
     } catch (error) {
       toast.error('Failed to load data');
