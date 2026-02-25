@@ -175,15 +175,22 @@ export default function NewExportSalePage() {
     setSaving(true);
     try {
       const totals = calculateTotals();
-      await exportSalesAPI.create({
+      const payload = {
         ...formData,
         subtotal: totals.subtotal,
         total_amount: totals.total
-      });
-      toast.success('Export sales contract created');
+      };
+      
+      if (isEditMode) {
+        await exportSalesAPI.update(id, payload);
+        toast.success('Export sales contract updated');
+      } else {
+        await exportSalesAPI.create(payload);
+        toast.success('Export sales contract created');
+      }
       navigate('/export-sales');
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to create contract';
+      const message = error.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} contract`;
       toast.error(message);
     } finally {
       setSaving(false);
