@@ -517,7 +517,7 @@ export default function NewIntlPurchasePage() {
 
             <div className="mt-6 space-y-3">
               <Button onClick={handleSubmit} disabled={saving} className="w-full btn-accent" data-testid="ipo-save-btn">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />Save Purchase Order</>}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />{isEditMode ? 'Update Purchase Order' : 'Save Purchase Order'}</>}
               </Button>
               <Button variant="outline" onClick={() => navigate('/intl-purchases')} className="w-full">Cancel</Button>
             </div>
