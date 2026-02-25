@@ -70,6 +70,7 @@ export default function NewLocalPurchasePage() {
       if (isEditMode) {
         const poRes = await localPurchasesAPI.get(id);
         const po = poRes.data;
+        setExistingStatus(po.status || 'draft');
         setFormData({
           company_id: po.company_id || '',
           branch_id: po.branch_id || '',
