@@ -40,10 +40,18 @@ import CurrenciesPage from './pages/master/CurrenciesPage';
 import PortsPage from './pages/master/PortsPage';
 import WeighbridgesMasterPage from './pages/master/WeighbridgesMasterPage';
 
-// Finance
+// Finance (Legacy)
 import AccountsPage from './pages/finance/AccountsPage';
 import JournalEntriesPage from './pages/finance/JournalEntriesPage';
 import PaymentsPage from './pages/finance/PaymentsPage';
+
+// Accounting Module (New)
+import ChartOfAccountsPage from './pages/accounting/ChartOfAccountsPage';
+import ExpensesPage from './pages/accounting/ExpensesPage';
+import IncomePage from './pages/accounting/IncomePage';
+import AccountingJournalEntriesPage from './pages/accounting/JournalEntriesPage';
+import ProfitAndLossPage from './pages/accounting/ProfitAndLossPage';
+import BalanceSheetPage from './pages/accounting/BalanceSheetPage';
 
 // Reports
 import PurchaseRegisterPage from './pages/reports/PurchaseRegisterPage';
