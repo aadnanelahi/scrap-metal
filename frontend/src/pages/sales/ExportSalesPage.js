@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { exportSalesAPI, customersAPI } from '../../lib/api';
-import { formatCurrency, formatDate, getStatusColor } from '../../lib/utils';
+import { formatCurrency, formatDate, getStatusColor, printDocument, generateExportSalesPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Check, Globe } from 'lucide-react';
+import { Plus, Eye, Loader2, Check, Globe, Printer, Pencil } from 'lucide-react';
 
 export default function ExportSalesPage() {
   const navigate = useNavigate();
