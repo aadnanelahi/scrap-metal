@@ -1204,6 +1204,35 @@ async def post_local_purchase(po_id: str, current_user: Dict = Depends(get_curre
     await log_audit(current_user['id'], current_user['email'], 'POST', 'local_purchase', po_id)
     return {"message": "Purchase order posted"}
 
+@api_router.post("/local-purchases/{po_id}/cancel")
+async def cancel_local_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Cancel a purchase order with required reason"""
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can cancel documents")
+    
+    if not data.get('cancellation_reason'):
+        raise HTTPException(status_code=400, detail="Cancellation reason is required")
+    
+    po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    await db.local_purchases.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": data['cancellation_reason'],
+            "cancelled_by": current_user['email'],
+            "cancelled_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_purchase', po_id)
+    return {"message": "Purchase order cancelled"}
+
 # ==================== INTERNATIONAL PURCHASES ====================
 @api_router.get("/intl-purchases", response_model=List[Dict])
 async def list_intl_purchases(
