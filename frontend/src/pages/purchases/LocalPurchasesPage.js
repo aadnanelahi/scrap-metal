@@ -49,6 +49,30 @@ export default function LocalPurchasesPage() {
     }
   };
 
+  const openCancelDialog = (id) => {
+    setCancelId(id);
+    setCancelReason('');
+    setCancelDialogOpen(true);
+  };
+
+  const handleCancel = async () => {
+    if (!cancelReason.trim()) {
+      toast.error('Cancellation reason is required');
+      return;
+    }
+    setCancelling(true);
+    try {
+      await localPurchasesAPI.cancel(cancelId, { cancellation_reason: cancelReason });
+      toast.success('Purchase order cancelled');
+      setCancelDialogOpen(false);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to cancel');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
