@@ -5,7 +5,7 @@ import { formatCurrency, formatDate, getStatusColor } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Check, Globe } from 'lucide-react';
+import { Plus, Eye, Loader2, Check, Globe, Pencil } from 'lucide-react';
 
 export default function IntlPurchasesPage() {
   const [purchases, setPurchases] = useState([]);
