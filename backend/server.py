@@ -3166,8 +3166,8 @@ async def delete_chart_of_account(account_id: str, current_user: Dict = Depends(
     require_finance_role(current_user)
     company_id = await get_user_company_id(current_user)
     
-    # Check for transactions
-    transactions = await db.journal_entries.count_documents({
+    # Check for transactions in accounting_journal_entries
+    transactions = await db.accounting_journal_entries.count_documents({
         "company_id": company_id,
         "lines.account_id": account_id
     })
