@@ -181,16 +181,23 @@ export default function NewIntlPurchasePage() {
     setSaving(true);
     try {
       const totals = calculateTotals();
-      await intlPurchasesAPI.create({
+      const payload = {
         ...formData,
         subtotal: totals.subtotal,
         landed_cost: totals.landedCost,
         total_amount: totals.landedCost
-      });
-      toast.success('International purchase order created');
+      };
+      
+      if (isEditMode) {
+        await intlPurchasesAPI.update(id, payload);
+        toast.success('International purchase order updated');
+      } else {
+        await intlPurchasesAPI.create(payload);
+        toast.success('International purchase order created');
+      }
       navigate('/intl-purchases');
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to create purchase order';
+      const message = error.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} purchase order`;
       toast.error(message);
     } finally {
       setSaving(false);
