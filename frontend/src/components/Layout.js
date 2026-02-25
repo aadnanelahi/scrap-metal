@@ -96,6 +96,18 @@ const navItems = [
     ],
   },
   {
+    title: 'Accounting',
+    icon: Receipt,
+    children: [
+      { title: 'Chart of Accounts', path: '/accounting/chart-of-accounts' },
+      { title: 'Expenses', path: '/accounting/expenses' },
+      { title: 'Income', path: '/accounting/income' },
+      { title: 'Journal Entries', path: '/accounting/journal-entries' },
+      { title: 'Profit & Loss', path: '/accounting/reports/profit-loss' },
+      { title: 'Balance Sheet', path: '/accounting/reports/balance-sheet' },
+    ],
+  },
+  {
     title: 'Reports',
     icon: BarChart3,
     children: [
