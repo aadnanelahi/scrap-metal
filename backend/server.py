@@ -1707,9 +1707,11 @@ async def get_dashboard_kpis(
         {"$match": purchase_filter},
         {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
     ]).to_list(1)
+    
+    # International purchases need to be converted to AED using exchange_rate
     intl_purchase_agg = await db.intl_purchases.aggregate([
         {"$match": purchase_filter},
-        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+        {"$group": {"_id": None, "total": {"$sum": {"$multiply": ["$total_amount", "$exchange_rate"]}}}}
     ]).to_list(1)
     
     total_purchases = (local_purchase_agg[0]["total"] if local_purchase_agg else 0) + \
