@@ -535,3 +535,112 @@ export const generatePaymentReceiptHTML = (receipt, company = null) => {
     </div>
   `;
 };
+
+
+// Generate Export Sales Contract HTML for printing
+export const generateExportSalesPrintHTML = (contract, company = null) => {
+  const companyName = company?.name || contract.company_name || 'ScrapOS Trading LLC';
+  const companyLogo = company?.logo || contract.company_logo || '';
+  const companySlogan = company?.slogan || contract.company_slogan || '';
+  const companyAddress = company?.address || contract.company_address || '';
+  const companyPhone = company?.phone || contract.company_phone || '';
+  const companyEmail = company?.email || contract.company_email || '';
+  const companyVat = company?.vat_number || contract.company_vat || '';
+  
+  const statusClass = contract.status === 'posted' ? 'status-posted' : 
+                      contract.status === 'cancelled' ? 'status-cancelled' :
+                      contract.status === 'pending' ? 'status-pending' : 'status-draft';
+  
+  const linesHTML = (contract.lines || []).map((line, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${line.item_name || '-'}</td>
+      <td class="text-right">${formatNumber(line.quantity, 3)}</td>
+      <td>${line.unit || 'MT'}</td>
+      <td class="text-right">${formatCurrency(line.unit_price, contract.currency)}</td>
+      <td class="text-right">${formatCurrency(line.line_total, contract.currency)}</td>
+    </tr>
+  `).join('');
+
+  const logoHTML = companyLogo ? `<img src="${companyLogo}" alt="${companyName}" style="max-height:80px;max-width:200px;object-fit:contain;margin-bottom:10px;" />` : '';
+
+  return `
+    <div class="print-header">
+      ${logoHTML}
+      <h1>${companyName}</h1>
+      ${companySlogan ? `<p style="font-style:italic;color:#64748b;margin-top:5px;">${companySlogan}</p>` : ''}
+      ${companyAddress ? `<p style="font-size:11px;color:#64748b;margin-top:5px;">${companyAddress}</p>` : ''}
+      ${companyPhone || companyEmail ? `<p style="font-size:11px;color:#64748b;">${[companyPhone, companyEmail].filter(Boolean).join(' | ')}</p>` : ''}
+      ${companyVat ? `<p style="font-size:11px;color:#64748b;">VAT: ${companyVat}</p>` : ''}
+      <p style="margin-top:10px;font-weight:600;font-size:16px;">EXPORT SALES CONTRACT</p>
+    </div>
+    
+    <div class="doc-info">
+      <div class="doc-info-left">
+        <h3>Contract Details</h3>
+        <p><strong>Contract No:</strong> ${contract.order_number || '-'}</p>
+        <p><strong>Date:</strong> ${formatDate(contract.order_date)}</p>
+        <p><strong>Delivery Date:</strong> ${contract.delivery_date ? formatDate(contract.delivery_date) : '-'}</p>
+        <p><strong>Incoterm:</strong> ${contract.incoterm_code || '-'}</p>
+        <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${contract.status || 'draft'}</span></p>
+      </div>
+      <div class="doc-info-right">
+        <h3>Customer Details</h3>
+        <p><strong>Name:</strong> ${contract.customer_name || '-'}</p>
+        <p><strong>Currency:</strong> ${contract.currency || 'USD'}</p>
+        <p><strong>Exchange Rate:</strong> ${contract.exchange_rate || 1}</p>
+        ${contract.port_of_loading_name ? `<p><strong>Port of Loading:</strong> ${contract.port_of_loading_name}</p>` : ''}
+        ${contract.port_of_destination_name ? `<p><strong>Destination:</strong> ${contract.port_of_destination_name}</p>` : ''}
+      </div>
+    </div>
+    
+    ${contract.container_number || contract.bl_number ? `
+    <div style="margin:15px 0;padding:10px;background:#f8fafc;border-radius:4px;">
+      <h3 style="margin:0 0 8px 0;font-size:12px;color:#64748b;">Shipping Information</h3>
+      ${contract.shipping_line ? `<p><strong>Shipping Line:</strong> ${contract.shipping_line}</p>` : ''}
+      ${contract.container_number ? `<p><strong>Container No:</strong> ${contract.container_number}</p>` : ''}
+      ${contract.bl_number ? `<p><strong>B/L Number:</strong> ${contract.bl_number}</p>` : ''}
+    </div>
+    ` : ''}
+    
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Item</th>
+          <th class="text-right">Qty</th>
+          <th>Unit</th>
+          <th class="text-right">Unit Price</th>
+          <th class="text-right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${linesHTML || '<tr><td colspan="6" style="text-align:center;">No items</td></tr>'}
+      </tbody>
+    </table>
+    
+    <div class="totals">
+      <p><strong>Subtotal:</strong> ${formatCurrency(contract.subtotal, contract.currency)}</p>
+      <p><strong>VAT (Zero-Rated):</strong> ${formatCurrency(0, contract.currency)}</p>
+      <p class="grand-total">Contract Value: ${formatCurrency(contract.total_amount, contract.currency)}</p>
+      <p style="font-size:11px;color:#64748b;">Equivalent in AED: ${formatCurrency(contract.total_amount * (contract.exchange_rate || 1), 'AED')}</p>
+    </div>
+    
+    ${contract.notes ? `<div style="margin-top:20px;"><strong>Notes:</strong> ${contract.notes}</div>` : ''}
+    
+    <div class="footer">
+      <div class="signature-line">
+        <hr />
+        <p>Seller</p>
+      </div>
+      <div class="signature-line">
+        <hr />
+        <p>Buyer</p>
+      </div>
+      <div class="signature-line">
+        <hr />
+        <p>Witness</p>
+      </div>
+    </div>
+  `;
+};
