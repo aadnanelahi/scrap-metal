@@ -277,15 +277,21 @@ export default function NewExportSalePage() {
               </div>
               <div>
                 <Label className="form-label">Currency</Label>
-                <Select value={formData.currency} onValueChange={(v) => setFormData({ ...formData, currency: v })}>
+                <Select value={formData.currency} onValueChange={(v) => {
+                  const selectedCurrency = currencies.find(c => c.code === v);
+                  setFormData({ 
+                    ...formData, 
+                    currency: v,
+                    exchange_rate: selectedCurrency?.exchange_rate || formData.exchange_rate
+                  });
+                }}>
                   <SelectTrigger className="form-input">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="USD">USD - US Dollar</SelectItem>
-                    <SelectItem value="EUR">EUR - Euro</SelectItem>
-                    <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                    <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                    {currencies.filter(c => c.is_active).map(c => (
+                      <SelectItem key={c.id} value={c.code}>{c.code} - {c.name} ({c.symbol})</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
