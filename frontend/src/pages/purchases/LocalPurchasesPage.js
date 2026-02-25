@@ -143,7 +143,8 @@ export default function LocalPurchasesPage() {
                       <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}`)} data-testid={`lpo-view-btn-${po.id}`}>
                         <Eye className="w-4 h-4" />
                       </Button>
-                      {po.status !== 'posted' && po.status !== 'cancelled' && (
+                      {/* Edit: Draft/Pending = anyone, Posted = manager only */}
+                      {(po.status !== 'cancelled' && (po.status !== 'posted' || isManager)) && (
                         <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}/edit`)} data-testid={`lpo-edit-btn-${po.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -154,7 +155,8 @@ export default function LocalPurchasesPage() {
                       }} data-testid={`lpo-print-btn-${po.id}`}>
                         <Printer className="w-4 h-4" />
                       </Button>
-                      {po.status !== 'posted' && po.status !== 'cancelled' && (
+                      {/* Post: Only manager can post */}
+                      {po.status === 'draft' && isManager && (
                         <Button
                           size="sm"
                           variant="outline"
@@ -163,6 +165,18 @@ export default function LocalPurchasesPage() {
                         >
                           <Check className="w-4 h-4 mr-1" />
                           Post
+                        </Button>
+                      )}
+                      {/* Cancel: Only manager can cancel */}
+                      {po.status !== 'cancelled' && isManager && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => openCancelDialog(po.id)}
+                          data-testid={`lpo-cancel-btn-${po.id}`}
+                        >
+                          <X className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
