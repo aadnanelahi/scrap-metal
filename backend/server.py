@@ -1163,6 +1163,10 @@ async def update_local_purchase(po_id: str, data: Dict, current_user: Dict = Dep
 
 @api_router.post("/local-purchases/{po_id}/post")
 async def post_local_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    # Only manager/admin can post
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can post documents")
+    
     po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1187,10 +1191,14 @@ async def post_local_purchase(po_id: str, current_user: Dict = Depends(get_curre
     # Create journal entry
     await create_purchase_journal_entry(po, 'local')
     
-    # Update status
+    # Update status with posted_by
     await db.local_purchases.update_one(
         {"id": po_id},
-        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "posted",
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "posted_by": current_user['email']
+        }}
     )
     
     await log_audit(current_user['id'], current_user['email'], 'POST', 'local_purchase', po_id)
