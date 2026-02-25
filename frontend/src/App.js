@@ -50,7 +50,7 @@ import ChartOfAccountsPage from './pages/accounting/ChartOfAccountsPage';
 import ExpensesPage from './pages/accounting/ExpensesPage';
 import IncomePage from './pages/accounting/IncomePage';
 import AccountingJournalEntriesPage from './pages/accounting/JournalEntriesPage';
-import ProfitAndLossPage from './pages/accounting/ProfitAndLossPage';
+import ProfitAndLossPage from './pages/accounting/ProfitLossPage';
 import BalanceSheetPage from './pages/accounting/BalanceSheetPage';
 
 // Reports
