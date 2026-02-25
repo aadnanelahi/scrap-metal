@@ -576,6 +576,38 @@ export default function NewLocalPurchasePage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Reason Dialog for Posted Documents */}
+      <Dialog open={editReasonDialogOpen} onOpenChange={setEditReasonDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Posted Document</DialogTitle>
+            <DialogDescription>
+              This document has already been posted. Please provide a reason for the modification. This will be recorded in the edit history.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="edit-reason" className="text-sm font-medium">Edit Reason *</Label>
+            <Textarea
+              id="edit-reason"
+              placeholder="Enter reason for editing this posted document..."
+              value={editReason}
+              onChange={(e) => setEditReason(e.target.value)}
+              className="mt-2"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditReasonDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditWithReason} disabled={saving}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Update with Reason
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
