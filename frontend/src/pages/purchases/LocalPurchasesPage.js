@@ -5,12 +5,23 @@ import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPr
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, Loader2, Check, ShoppingCart, Pencil } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, ShoppingCart, Pencil, X } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
+import { Textarea } from '../../components/ui/textarea';
+import { Label } from '../../components/ui/label';
 
 export default function LocalPurchasesPage() {
+  const { user } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [cancelId, setCancelId] = useState(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
   const navigate = useNavigate();
+  
+  const isManager = user?.role === 'admin' || user?.role === 'manager';
 
   useEffect(() => {
     loadData();
