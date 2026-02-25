@@ -144,10 +144,18 @@ function AppRoutes() {
       <Route path="/ports" element={<ProtectedRoute><PortsPage /></ProtectedRoute>} />
       <Route path="/weighbridges-master" element={<ProtectedRoute><WeighbridgesMasterPage /></ProtectedRoute>} />
 
-      {/* Finance */}
+      {/* Finance (Legacy) */}
       <Route path="/accounts" element={<ProtectedRoute><AccountsPage /></ProtectedRoute>} />
       <Route path="/journal-entries" element={<ProtectedRoute><JournalEntriesPage /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+
+      {/* Accounting Module (New) */}
+      <Route path="/accounting/chart-of-accounts" element={<ProtectedRoute><ChartOfAccountsPage /></ProtectedRoute>} />
+      <Route path="/accounting/expenses" element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
+      <Route path="/accounting/income" element={<ProtectedRoute><IncomePage /></ProtectedRoute>} />
+      <Route path="/accounting/journal-entries" element={<ProtectedRoute><AccountingJournalEntriesPage /></ProtectedRoute>} />
+      <Route path="/accounting/reports/profit-loss" element={<ProtectedRoute><ProfitAndLossPage /></ProtectedRoute>} />
+      <Route path="/accounting/reports/balance-sheet" element={<ProtectedRoute><BalanceSheetPage /></ProtectedRoute>} />
 
       {/* Reports */}
       <Route path="/reports/purchases" element={<ProtectedRoute><PurchaseRegisterPage /></ProtectedRoute>} />
