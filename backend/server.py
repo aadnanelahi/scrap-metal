@@ -1720,9 +1720,11 @@ async def get_dashboard_kpis(
         {"$match": sales_filter},
         {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
     ]).to_list(1)
+    
+    # Export sales need to be converted to AED using exchange_rate
     export_sales_agg = await db.export_sales.aggregate([
         {"$match": sales_filter},
-        {"$group": {"_id": None, "total": {"$sum": "$total_amount"}}}
+        {"$group": {"_id": None, "total": {"$sum": {"$multiply": ["$total_amount", "$exchange_rate"]}}}}
     ]).to_list(1)
     
     total_sales = (local_sales_agg[0]["total"] if local_sales_agg else 0) + \
