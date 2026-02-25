@@ -113,6 +113,9 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 
 ## Recent Changes (February 25, 2026)
 
+### Bug Fix ✅
+- **Fixed Local PO/SO Creation Error**: Added frontend validation to check that line items have required fields (Item, Quantity, Unit Price) before submitting. Previously, users could add empty line items which caused a generic "Failed to create" error. Now shows clear validation message.
+
 ### New Features ✅ - Accounting Module Phase 1
 - **Chart of Accounts (COA)**: Full CRUD operations with 74 default accounts in hierarchical structure
   - Assets, Liabilities, Equity, Income, COGS, and Expense categories
