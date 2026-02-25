@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { localPurchasesAPI, suppliersAPI, branchesAPI, scrapItemsAPI, vatCodesAPI, brokersAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, toISODateString } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -12,6 +12,9 @@ import { ArrowLeft, Plus, Trash2, Loader2, Save, AlertCircle } from 'lucide-reac
 
 export default function NewLocalPurchasePage() {
   const navigate = useNavigate();
+  const { id } = useParams(); // For edit mode
+  const isEditMode = !!id;
+  
   const [companies, setCompanies] = useState([]);
   const [branches, setBranches] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -57,12 +60,32 @@ export default function NewLocalPurchasePage() {
       setVatCodes(vatRes.data || []);
       setBrokers(brokerRes.data || []);
 
-      // Set defaults
-      if (compRes.data && compRes.data.length > 0) {
-        setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
-      }
-      if (branchRes.data && branchRes.data.length > 0) {
-        setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+      // If edit mode, load existing PO data
+      if (isEditMode) {
+        const poRes = await localPurchasesAPI.get(id);
+        const po = poRes.data;
+        setFormData({
+          company_id: po.company_id || '',
+          branch_id: po.branch_id || '',
+          supplier_id: po.supplier_id || '',
+          supplier_name: po.supplier_name || '',
+          order_date: po.order_date || toISODateString(new Date()),
+          expected_date: po.expected_date || '',
+          broker_id: po.broker_id || '',
+          broker_commission_type: po.broker_commission_type || 'per_mt',
+          broker_commission_rate: po.broker_commission_rate || 0,
+          currency: po.currency || 'AED',
+          notes: po.notes || '',
+          lines: po.lines || []
+        });
+      } else {
+        // Set defaults for new PO
+        if (compRes.data && compRes.data.length > 0) {
+          setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
+        }
+        if (branchRes.data && branchRes.data.length > 0) {
+          setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+        }
       }
     } catch (error) {
       toast.error('Failed to load data');
