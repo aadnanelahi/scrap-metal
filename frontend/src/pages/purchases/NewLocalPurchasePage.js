@@ -169,13 +169,19 @@ export default function NewLocalPurchasePage() {
     return { subtotal, vatAmount, total: subtotal + vatAmount };
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (reasonForEdit = null) => {
     if (!formData.company_id || !formData.branch_id || !formData.supplier_id) {
       toast.error('Please fill all required fields');
       return;
     }
     if (formData.lines.length === 0) {
       toast.error('Please add at least one line item');
+      return;
+    }
+
+    // If editing a posted document, require edit reason
+    if (isEditMode && existingStatus === 'posted' && !reasonForEdit) {
+      setEditReasonDialogOpen(true);
       return;
     }
 
@@ -188,6 +194,11 @@ export default function NewLocalPurchasePage() {
         vat_amount: totals.vatAmount,
         total_amount: totals.total
       };
+      
+      // Add edit reason for posted documents
+      if (reasonForEdit) {
+        payload.edit_reason = reasonForEdit;
+      }
       
       if (isEditMode) {
         await localPurchasesAPI.update(id, payload);
@@ -203,6 +214,15 @@ export default function NewLocalPurchasePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEditWithReason = () => {
+    if (!editReason.trim()) {
+      toast.error('Edit reason is required for posted documents');
+      return;
+    }
+    setEditReasonDialogOpen(false);
+    handleSubmit(editReason);
   };
 
   const totals = calculateTotals();
