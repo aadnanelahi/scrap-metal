@@ -178,6 +178,13 @@ export default function NewLocalPurchasePage() {
       toast.error('Please add at least one line item');
       return;
     }
+    
+    // Validate line items have required data
+    const invalidLines = formData.lines.filter(line => !line.item_id || !line.quantity || line.quantity <= 0 || !line.unit_price || line.unit_price <= 0);
+    if (invalidLines.length > 0) {
+      toast.error('Please fill in Item, Quantity, and Unit Price for all line items');
+      return;
+    }
 
     // If editing a posted document, require edit reason
     if (isEditMode && existingStatus === 'posted' && !reasonForEdit) {
