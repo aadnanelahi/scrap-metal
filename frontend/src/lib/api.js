@@ -248,6 +248,45 @@ export const reportsAPI = {
   trialBalance: (params) => api.get('/reports/trial-balance', { params }),
 };
 
+// ==================== ACCOUNTING MODULE ====================
+export const chartOfAccountsAPI = {
+  list: (params) => api.get('/accounting/chart-of-accounts', { params }),
+  get: (id) => api.get(`/accounting/chart-of-accounts/${id}`),
+  create: (data) => api.post('/accounting/chart-of-accounts', data),
+  update: (id, data) => api.put(`/accounting/chart-of-accounts/${id}`, data),
+  delete: (id) => api.delete(`/accounting/chart-of-accounts/${id}`),
+  initialize: () => api.post('/accounting/initialize-coa'),
+};
+
+export const journalEntriesAPI = {
+  list: (params) => api.get('/accounting/journal-entries', { params }),
+  get: (id) => api.get(`/accounting/journal-entries/${id}`),
+  create: (data) => api.post('/accounting/journal-entries', data),
+  reverse: (id, data) => api.post(`/accounting/journal-entries/${id}/reverse`, data),
+};
+
+export const expensesAPI = {
+  list: (params) => api.get('/accounting/expenses', { params }),
+  create: (data) => api.post('/accounting/expenses', data),
+};
+
+export const incomeAPI = {
+  list: (params) => api.get('/accounting/income', { params }),
+  create: (data) => api.post('/accounting/income', data),
+};
+
+export const accountSettingsAPI = {
+  get: () => api.get('/accounting/settings'),
+  update: (data) => api.put('/accounting/settings', data),
+};
+
+export const accountingReportsAPI = {
+  trialBalance: (params) => api.get('/accounting/reports/trial-balance', { params }),
+  profitLoss: (params) => api.get('/accounting/reports/profit-loss', { params }),
+  balanceSheet: (params) => api.get('/accounting/reports/balance-sheet', { params }),
+  cashFlow: (params) => api.get('/accounting/reports/cash-flow', { params }),
+};
+
 // Seed Data
 export const seedDataAPI = {
   seed: () => api.post('/seed-data'),
