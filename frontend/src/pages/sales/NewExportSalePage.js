@@ -257,10 +257,10 @@ export default function NewExportSalePage() {
         </Button>
         <div>
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">
-            New Export Sales Contract
+            {isEditMode ? 'Edit Export Sales Contract' : 'New Export Sales Contract'}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Create export contract (zero-rated VAT)
+            {isEditMode ? 'Update export contract details' : 'Create export contract (zero-rated VAT)'}
           </p>
         </div>
       </div>
