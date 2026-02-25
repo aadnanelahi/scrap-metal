@@ -122,6 +122,7 @@ function AppRoutes() {
       <Route path="/local-sales/:id" element={<ProtectedRoute><LocalSaleDetailPage /></ProtectedRoute>} />
       <Route path="/export-sales" element={<ProtectedRoute><ExportSalesPage /></ProtectedRoute>} />
       <Route path="/export-sales/new" element={<ProtectedRoute><NewExportSalePage /></ProtectedRoute>} />
+      <Route path="/export-sales/:id/edit" element={<ProtectedRoute><NewExportSalePage /></ProtectedRoute>} />
 
       {/* Master Data */}
       <Route path="/companies" element={<ProtectedRoute><CompaniesPage /></ProtectedRoute>} />
