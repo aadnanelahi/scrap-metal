@@ -3034,6 +3034,1048 @@ async def run_backup_now(current_user: Dict = Depends(get_current_user)):
     else:
         raise HTTPException(status_code=500, detail="Backup failed")
 
+# ==================== ACCOUNTING MODULE ====================
+from accounting import (
+    ChartOfAccount, ChartOfAccountBase, AccountType,
+    JournalEntryFull, JournalEntryBase, JournalEntryLineBase,
+    ExpenseEntry, ExpenseEntryBase, IncomeEntry, IncomeEntryBase,
+    AccountSettings, AccountSettingsBase, PaymentMethod,
+    DEFAULT_COA_TEMPLATE, get_normal_balance
+)
+
+def require_finance_role(current_user: Dict):
+    """Only admin, manager, or accountant can access finance functions"""
+    if current_user.get('role') not in ['admin', 'manager', 'accountant']:
+        raise HTTPException(status_code=403, detail="Finance access required")
+
+async def get_user_company_id(current_user: Dict) -> str:
+    """Get company_id for the current user - enforce multi-tenant isolation"""
+    company_id = current_user.get('company_id')
+    if not company_id:
+        # If user has no company_id, try to get the first company (for admin)
+        company = await db.companies.find_one({}, {"_id": 0, "id": 1})
+        if company:
+            company_id = company['id']
+        else:
+            raise HTTPException(status_code=400, detail="No company assigned to user")
+    return company_id
+
+async def generate_entry_number(company_id: str, prefix: str, collection: str) -> str:
+    """Generate sequential entry number for accounting documents"""
+    year_month = datetime.now(timezone.utc).strftime("%Y%m")
+    count = await db[collection].count_documents({
+        "company_id": company_id,
+        "entry_number": {"$regex": f"^{prefix}-{year_month}"}
+    })
+    return f"{prefix}-{year_month}-{str(count + 1).zfill(4)}"
+
+# Chart of Accounts API
+@api_router.get("/accounting/chart-of-accounts")
+async def list_chart_of_accounts(
+    account_type: Optional[str] = None,
+    is_active: bool = True,
+    current_user: Dict = Depends(get_current_user)
+):
+    """List all accounts for the company"""
+    company_id = await get_user_company_id(current_user)
+    
+    filters = {"company_id": company_id}
+    if is_active is not None:
+        filters["is_active"] = is_active
+    if account_type:
+        filters["account_type"] = account_type
+    
+    accounts = await db.chart_of_accounts.find(filters, {"_id": 0}).sort("account_code", 1).to_list(500)
+    return accounts
+
+@api_router.get("/accounting/chart-of-accounts/{account_id}")
+async def get_chart_of_account(account_id: str, current_user: Dict = Depends(get_current_user)):
+    """Get single account"""
+    company_id = await get_user_company_id(current_user)
+    account = await db.chart_of_accounts.find_one(
+        {"id": account_id, "company_id": company_id}, {"_id": 0}
+    )
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return account
+
+@api_router.post("/accounting/chart-of-accounts")
+async def create_chart_of_account(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Create new account in Chart of Accounts"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    # Check for duplicate account code
+    existing = await db.chart_of_accounts.find_one({
+        "company_id": company_id,
+        "account_code": data['account_code']
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Account code already exists")
+    
+    account = ChartOfAccount(
+        company_id=company_id,
+        account_code=data['account_code'],
+        account_name=data['account_name'],
+        account_type=data['account_type'],
+        parent_account_id=data.get('parent_account_id'),
+        description=data.get('description'),
+        is_header=data.get('is_header', False),
+        is_active=data.get('is_active', True),
+        normal_balance=get_normal_balance(data['account_type'])
+    )
+    
+    await db.chart_of_accounts.insert_one(account.model_dump())
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'chart_of_account', account.id)
+    
+    return {**account.model_dump(), "_id": None}
+
+@api_router.put("/accounting/chart-of-accounts/{account_id}")
+async def update_chart_of_account(account_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Update account"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    existing = await db.chart_of_accounts.find_one(
+        {"id": account_id, "company_id": company_id}, {"_id": 0}
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Cannot change account_code if transactions exist
+    if data.get('account_code') and data['account_code'] != existing['account_code']:
+        transactions = await db.journal_entry_lines.count_documents({"account_id": account_id})
+        if transactions > 0:
+            raise HTTPException(status_code=400, detail="Cannot change account code with existing transactions")
+    
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    await db.chart_of_accounts.update_one(
+        {"id": account_id, "company_id": company_id},
+        {"$set": data}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'chart_of_account', account_id)
+    return {"message": "Account updated"}
+
+@api_router.delete("/accounting/chart-of-accounts/{account_id}")
+async def delete_chart_of_account(account_id: str, current_user: Dict = Depends(get_current_user)):
+    """Delete account (only if no transactions)"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    # Check for transactions
+    transactions = await db.journal_entries.count_documents({
+        "company_id": company_id,
+        "lines.account_id": account_id
+    })
+    if transactions > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete account with existing transactions")
+    
+    result = await db.chart_of_accounts.delete_one(
+        {"id": account_id, "company_id": company_id}
+    )
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'chart_of_account', account_id)
+    return {"message": "Account deleted"}
+
+@api_router.post("/accounting/initialize-coa")
+async def initialize_chart_of_accounts(current_user: Dict = Depends(get_current_user)):
+    """Initialize default Chart of Accounts for a company"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    # Check if COA already exists
+    existing = await db.chart_of_accounts.count_documents({"company_id": company_id})
+    if existing > 0:
+        raise HTTPException(status_code=400, detail="Chart of Accounts already initialized")
+    
+    # Create accounts from template
+    account_map = {}  # code -> id mapping for parent references
+    
+    for template in DEFAULT_COA_TEMPLATE:
+        account_id = str(uuid.uuid4())
+        parent_id = None
+        
+        if template.get('parent'):
+            parent_id = account_map.get(template['parent'])
+        
+        account = {
+            "id": account_id,
+            "company_id": company_id,
+            "account_code": template['code'],
+            "account_name": template['name'],
+            "account_type": template['type'],
+            "parent_account_id": parent_id,
+            "is_header": template.get('is_header', False),
+            "is_active": True,
+            "normal_balance": template.get('normal_balance', get_normal_balance(template['type'])),
+            "current_balance": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.chart_of_accounts.insert_one(account)
+        account_map[template['code']] = account_id
+    
+    # Initialize account settings with default accounts
+    settings = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "fiscal_year_start": "01-01",
+        "fiscal_year_end": "12-31",
+        "default_cash_account_id": account_map.get("1110"),
+        "default_bank_account_id": account_map.get("1120"),
+        "default_receivable_account_id": account_map.get("1200"),
+        "default_payable_account_id": account_map.get("2110"),
+        "default_sales_account_id": account_map.get("4110"),
+        "default_cogs_account_id": account_map.get("5100"),
+        "default_inventory_account_id": account_map.get("1310"),
+        "base_currency": "AED",
+        "current_fiscal_year": datetime.now().year,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.account_settings.insert_one(settings)
+    
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'initialize_coa', company_id)
+    return {"message": f"Chart of Accounts initialized with {len(DEFAULT_COA_TEMPLATE)} accounts"}
+
+# Journal Entries API
+@api_router.get("/accounting/journal-entries")
+async def list_journal_entries(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: Dict = Depends(get_current_user)
+):
+    """List journal entries"""
+    company_id = await get_user_company_id(current_user)
+    
+    filters = {"company_id": company_id}
+    if start_date:
+        filters["entry_date"] = {"$gte": start_date}
+    if end_date:
+        filters.setdefault("entry_date", {})["$lte"] = end_date
+    if reference_type:
+        filters["reference_type"] = reference_type
+    
+    entries = await db.accounting_journal_entries.find(filters, {"_id": 0}).sort("entry_date", -1).skip(skip).limit(limit).to_list(limit)
+    return entries
+
+@api_router.get("/accounting/journal-entries/{entry_id}")
+async def get_journal_entry(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    """Get single journal entry"""
+    company_id = await get_user_company_id(current_user)
+    entry = await db.accounting_journal_entries.find_one(
+        {"id": entry_id, "company_id": company_id}, {"_id": 0}
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+    return entry
+
+@api_router.post("/accounting/journal-entries")
+async def create_journal_entry(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Create manual journal entry"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    # Check period lock
+    settings = await db.account_settings.find_one({"company_id": company_id}, {"_id": 0})
+    if settings and settings.get('period_lock_date'):
+        if data['entry_date'] <= settings['period_lock_date']:
+            raise HTTPException(status_code=400, detail="Cannot post to locked period")
+    
+    # Validate debit = credit
+    lines = data.get('lines', [])
+    total_debit = sum(line.get('debit_amount', 0) for line in lines)
+    total_credit = sum(line.get('credit_amount', 0) for line in lines)
+    
+    if abs(total_debit - total_credit) > 0.01:
+        raise HTTPException(status_code=400, detail=f"Journal entry must balance. Debit: {total_debit}, Credit: {total_credit}")
+    
+    entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    
+    entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "entry_date": data['entry_date'],
+        "reference_type": data.get('reference_type', 'manual'),
+        "reference_id": data.get('reference_id'),
+        "reference_number": data.get('reference_number'),
+        "description": data.get('description', ''),
+        "lines": lines,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['email'],
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.accounting_journal_entries.insert_one(entry)
+    
+    # Update account balances
+    for line in lines:
+        account = await db.chart_of_accounts.find_one({"id": line['account_id']}, {"_id": 0})
+        if account:
+            balance_change = line.get('debit_amount', 0) - line.get('credit_amount', 0)
+            if account.get('normal_balance') == 'credit':
+                balance_change = -balance_change
+            
+            await db.chart_of_accounts.update_one(
+                {"id": line['account_id']},
+                {"$inc": {"current_balance": balance_change}}
+            )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'journal_entry', entry['id'])
+    return {**entry, "_id": None}
+
+@api_router.post("/accounting/journal-entries/{entry_id}/reverse")
+async def reverse_journal_entry(entry_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Reverse a journal entry"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    original = await db.accounting_journal_entries.find_one(
+        {"id": entry_id, "company_id": company_id}, {"_id": 0}
+    )
+    if not original:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+    
+    if original.get('is_reversed'):
+        raise HTTPException(status_code=400, detail="Entry already reversed")
+    
+    # Create reversing entry
+    reversal_date = data.get('reversal_date', datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    
+    # Swap debits and credits
+    reversed_lines = []
+    for line in original.get('lines', []):
+        reversed_lines.append({
+            **line,
+            "debit_amount": line.get('credit_amount', 0),
+            "credit_amount": line.get('debit_amount', 0)
+        })
+    
+    reversal_entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "entry_date": reversal_date,
+        "reference_type": "reversal",
+        "reference_id": entry_id,
+        "reference_number": original['entry_number'],
+        "description": f"Reversal of {original['entry_number']}: {data.get('reason', 'No reason provided')}",
+        "lines": reversed_lines,
+        "total_debit": original['total_credit'],
+        "total_credit": original['total_debit'],
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['email'],
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.accounting_journal_entries.insert_one(reversal_entry)
+    
+    # Mark original as reversed
+    await db.accounting_journal_entries.update_one(
+        {"id": entry_id},
+        {"$set": {"is_reversed": True, "reversed_by_entry_id": reversal_entry['id']}}
+    )
+    
+    # Update account balances
+    for line in reversed_lines:
+        account = await db.chart_of_accounts.find_one({"id": line['account_id']}, {"_id": 0})
+        if account:
+            balance_change = line.get('debit_amount', 0) - line.get('credit_amount', 0)
+            if account.get('normal_balance') == 'credit':
+                balance_change = -balance_change
+            await db.chart_of_accounts.update_one(
+                {"id": line['account_id']},
+                {"$inc": {"current_balance": balance_change}}
+            )
+    
+    await log_audit(current_user['id'], current_user['email'], 'REVERSE', 'journal_entry', entry_id)
+    return {**reversal_entry, "_id": None}
+
+# Expense Entries API
+@api_router.get("/accounting/expenses")
+async def list_expenses(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: Dict = Depends(get_current_user)
+):
+    """List expense entries"""
+    company_id = await get_user_company_id(current_user)
+    
+    filters = {"company_id": company_id}
+    if start_date:
+        filters["expense_date"] = {"$gte": start_date}
+    if end_date:
+        filters.setdefault("expense_date", {})["$lte"] = end_date
+    
+    expenses = await db.expense_entries.find(filters, {"_id": 0}).sort("expense_date", -1).skip(skip).limit(limit).to_list(limit)
+    return expenses
+
+@api_router.post("/accounting/expenses")
+async def create_expense(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Create expense entry with auto journal"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    entry_number = await generate_entry_number(company_id, "EXP", "expense_entries")
+    
+    expense = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "expense_date": data['expense_date'],
+        "expense_account_id": data['expense_account_id'],
+        "expense_account_code": data.get('expense_account_code', ''),
+        "expense_account_name": data.get('expense_account_name', ''),
+        "amount": data['amount'],
+        "payment_method": data['payment_method'],
+        "payment_account_id": data['payment_account_id'],
+        "payment_account_name": data.get('payment_account_name', ''),
+        "reference_number": data.get('reference_number'),
+        "description": data.get('description', ''),
+        "attachment_url": data.get('attachment_url'),
+        "status": "posted",
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Get payment account details
+    payment_account = await db.chart_of_accounts.find_one({"id": data['payment_account_id']}, {"_id": 0})
+    expense_account = await db.chart_of_accounts.find_one({"id": data['expense_account_id']}, {"_id": 0})
+    
+    # Create auto journal entry
+    je_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    journal_entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": je_number,
+        "entry_date": data['expense_date'],
+        "reference_type": "expense",
+        "reference_id": expense['id'],
+        "reference_number": entry_number,
+        "description": f"Expense: {data.get('description', '')}",
+        "lines": [
+            {
+                "account_id": data['expense_account_id'],
+                "account_code": expense_account['account_code'] if expense_account else '',
+                "account_name": expense_account['account_name'] if expense_account else '',
+                "debit_amount": data['amount'],
+                "credit_amount": 0,
+                "description": "Expense debit"
+            },
+            {
+                "account_id": data['payment_account_id'],
+                "account_code": payment_account['account_code'] if payment_account else '',
+                "account_name": payment_account['account_name'] if payment_account else '',
+                "debit_amount": 0,
+                "credit_amount": data['amount'],
+                "description": "Payment credit"
+            }
+        ],
+        "total_debit": data['amount'],
+        "total_credit": data['amount'],
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['email'],
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.accounting_journal_entries.insert_one(journal_entry)
+    expense['journal_entry_id'] = journal_entry['id']
+    await db.expense_entries.insert_one(expense)
+    
+    # Update account balances
+    if expense_account:
+        await db.chart_of_accounts.update_one(
+            {"id": data['expense_account_id']},
+            {"$inc": {"current_balance": data['amount']}}
+        )
+    if payment_account:
+        await db.chart_of_accounts.update_one(
+            {"id": data['payment_account_id']},
+            {"$inc": {"current_balance": -data['amount']}}
+        )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'expense_entry', expense['id'])
+    return {**expense, "_id": None}
+
+# Income Entries API
+@api_router.get("/accounting/income")
+async def list_income(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    current_user: Dict = Depends(get_current_user)
+):
+    """List income entries"""
+    company_id = await get_user_company_id(current_user)
+    
+    filters = {"company_id": company_id}
+    if start_date:
+        filters["income_date"] = {"$gte": start_date}
+    if end_date:
+        filters.setdefault("income_date", {})["$lte"] = end_date
+    
+    income = await db.income_entries.find(filters, {"_id": 0}).sort("income_date", -1).skip(skip).limit(limit).to_list(limit)
+    return income
+
+@api_router.post("/accounting/income")
+async def create_income(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Create income entry with auto journal"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    entry_number = await generate_entry_number(company_id, "INC", "income_entries")
+    
+    income = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "income_date": data['income_date'],
+        "income_account_id": data['income_account_id'],
+        "income_account_code": data.get('income_account_code', ''),
+        "income_account_name": data.get('income_account_name', ''),
+        "amount": data['amount'],
+        "payment_method": data['payment_method'],
+        "payment_account_id": data['payment_account_id'],
+        "payment_account_name": data.get('payment_account_name', ''),
+        "reference_number": data.get('reference_number'),
+        "description": data.get('description', ''),
+        "status": "posted",
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    payment_account = await db.chart_of_accounts.find_one({"id": data['payment_account_id']}, {"_id": 0})
+    income_account = await db.chart_of_accounts.find_one({"id": data['income_account_id']}, {"_id": 0})
+    
+    # Create auto journal entry
+    je_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    journal_entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": je_number,
+        "entry_date": data['income_date'],
+        "reference_type": "income",
+        "reference_id": income['id'],
+        "reference_number": entry_number,
+        "description": f"Income: {data.get('description', '')}",
+        "lines": [
+            {
+                "account_id": data['payment_account_id'],
+                "account_code": payment_account['account_code'] if payment_account else '',
+                "account_name": payment_account['account_name'] if payment_account else '',
+                "debit_amount": data['amount'],
+                "credit_amount": 0,
+                "description": "Payment received"
+            },
+            {
+                "account_id": data['income_account_id'],
+                "account_code": income_account['account_code'] if income_account else '',
+                "account_name": income_account['account_name'] if income_account else '',
+                "debit_amount": 0,
+                "credit_amount": data['amount'],
+                "description": "Income credit"
+            }
+        ],
+        "total_debit": data['amount'],
+        "total_credit": data['amount'],
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['email'],
+        "created_by": current_user['email'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.accounting_journal_entries.insert_one(journal_entry)
+    income['journal_entry_id'] = journal_entry['id']
+    await db.income_entries.insert_one(income)
+    
+    # Update account balances
+    if payment_account:
+        await db.chart_of_accounts.update_one(
+            {"id": data['payment_account_id']},
+            {"$inc": {"current_balance": data['amount']}}
+        )
+    if income_account:
+        await db.chart_of_accounts.update_one(
+            {"id": data['income_account_id']},
+            {"$inc": {"current_balance": data['amount']}}  # Income increases with credit
+        )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'income_entry', income['id'])
+    return {**income, "_id": None}
+
+# Account Settings API
+@api_router.get("/accounting/settings")
+async def get_account_settings(current_user: Dict = Depends(get_current_user)):
+    """Get account settings for company"""
+    company_id = await get_user_company_id(current_user)
+    
+    settings = await db.account_settings.find_one({"company_id": company_id}, {"_id": 0})
+    if not settings:
+        return {
+            "company_id": company_id,
+            "fiscal_year_start": "01-01",
+            "fiscal_year_end": "12-31",
+            "base_currency": "AED",
+            "current_fiscal_year": datetime.now().year
+        }
+    return settings
+
+@api_router.put("/accounting/settings")
+async def update_account_settings(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Update account settings"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    data['updated_at'] = datetime.now(timezone.utc).isoformat()
+    
+    result = await db.account_settings.update_one(
+        {"company_id": company_id},
+        {"$set": data},
+        upsert=True
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'account_settings', company_id)
+    return {"message": "Settings updated"}
+
+# Financial Reports API
+@api_router.get("/accounting/reports/trial-balance")
+async def get_accounting_trial_balance(
+    as_of_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Trial Balance report with account hierarchy"""
+    company_id = await get_user_company_id(current_user)
+    
+    if not as_of_date:
+        as_of_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Get all accounts
+    accounts = await db.chart_of_accounts.find(
+        {"company_id": company_id, "is_active": True},
+        {"_id": 0}
+    ).sort("account_code", 1).to_list(500)
+    
+    # Calculate balances from journal entries
+    pipeline = [
+        {"$match": {"company_id": company_id, "entry_date": {"$lte": as_of_date}}},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_id",
+            "total_debit": {"$sum": {"$ifNull": ["$lines.debit_amount", 0]}},
+            "total_credit": {"$sum": {"$ifNull": ["$lines.credit_amount", 0]}}
+        }}
+    ]
+    
+    balances = await db.accounting_journal_entries.aggregate(pipeline).to_list(500)
+    balance_map = {b["_id"]: b for b in balances}
+    
+    # Build report
+    report_accounts = []
+    total_debit = 0
+    total_credit = 0
+    
+    for account in accounts:
+        if account.get('is_header'):
+            continue
+            
+        balance = balance_map.get(account['id'], {"total_debit": 0, "total_credit": 0})
+        debit = balance['total_debit']
+        credit = balance['total_credit']
+        
+        # Calculate closing balance based on normal balance
+        if account.get('normal_balance') == 'debit':
+            closing = debit - credit
+            closing_debit = closing if closing > 0 else 0
+            closing_credit = -closing if closing < 0 else 0
+        else:
+            closing = credit - debit
+            closing_credit = closing if closing > 0 else 0
+            closing_debit = -closing if closing < 0 else 0
+        
+        if debit > 0 or credit > 0:
+            report_accounts.append({
+                "account_id": account['id'],
+                "account_code": account['account_code'],
+                "account_name": account['account_name'],
+                "account_type": account['account_type'],
+                "debit": round(debit, 2),
+                "credit": round(credit, 2),
+                "closing_debit": round(closing_debit, 2),
+                "closing_credit": round(closing_credit, 2)
+            })
+            total_debit += closing_debit
+            total_credit += closing_credit
+    
+    return {
+        "as_of_date": as_of_date,
+        "company_id": company_id,
+        "accounts": report_accounts,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
+        "difference": round(total_debit - total_credit, 2),
+        "is_balanced": abs(total_debit - total_credit) < 0.01
+    }
+
+@api_router.get("/accounting/reports/profit-loss")
+async def get_profit_loss_report(
+    start_date: str,
+    end_date: str,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Profit & Loss Statement"""
+    company_id = await get_user_company_id(current_user)
+    
+    # Get income, COGS, and expense accounts
+    accounts = await db.chart_of_accounts.find(
+        {
+            "company_id": company_id,
+            "is_active": True,
+            "account_type": {"$in": ["income", "cogs", "expense"]}
+        },
+        {"_id": 0}
+    ).sort("account_code", 1).to_list(500)
+    
+    # Calculate balances from journal entries
+    pipeline = [
+        {"$match": {
+            "company_id": company_id,
+            "entry_date": {"$gte": start_date, "$lte": end_date}
+        }},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_id",
+            "total_debit": {"$sum": {"$ifNull": ["$lines.debit_amount", 0]}},
+            "total_credit": {"$sum": {"$ifNull": ["$lines.credit_amount", 0]}}
+        }}
+    ]
+    
+    balances = await db.accounting_journal_entries.aggregate(pipeline).to_list(500)
+    balance_map = {b["_id"]: b for b in balances}
+    
+    # Build report sections
+    income_items = []
+    cogs_items = []
+    expense_items = []
+    
+    total_income = 0
+    total_cogs = 0
+    total_expenses = 0
+    
+    for account in accounts:
+        if account.get('is_header'):
+            continue
+            
+        balance = balance_map.get(account['id'], {"total_debit": 0, "total_credit": 0})
+        
+        # Calculate amount based on account type
+        if account['account_type'] == 'income':
+            amount = balance['total_credit'] - balance['total_debit']
+            if amount != 0:
+                income_items.append({
+                    "account_code": account['account_code'],
+                    "account_name": account['account_name'],
+                    "amount": round(amount, 2)
+                })
+                total_income += amount
+        elif account['account_type'] == 'cogs':
+            amount = balance['total_debit'] - balance['total_credit']
+            if amount != 0:
+                cogs_items.append({
+                    "account_code": account['account_code'],
+                    "account_name": account['account_name'],
+                    "amount": round(amount, 2)
+                })
+                total_cogs += amount
+        elif account['account_type'] == 'expense':
+            amount = balance['total_debit'] - balance['total_credit']
+            if amount != 0:
+                expense_items.append({
+                    "account_code": account['account_code'],
+                    "account_name": account['account_name'],
+                    "amount": round(amount, 2)
+                })
+                total_expenses += amount
+    
+    gross_profit = total_income - total_cogs
+    net_profit = gross_profit - total_expenses
+    
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "company_id": company_id,
+        "income": {
+            "items": income_items,
+            "total": round(total_income, 2)
+        },
+        "cost_of_goods_sold": {
+            "items": cogs_items,
+            "total": round(total_cogs, 2)
+        },
+        "gross_profit": round(gross_profit, 2),
+        "operating_expenses": {
+            "items": expense_items,
+            "total": round(total_expenses, 2)
+        },
+        "net_profit": round(net_profit, 2)
+    }
+
+@api_router.get("/accounting/reports/balance-sheet")
+async def get_balance_sheet_report(
+    as_of_date: str,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Balance Sheet"""
+    company_id = await get_user_company_id(current_user)
+    
+    # Get asset, liability, and equity accounts
+    accounts = await db.chart_of_accounts.find(
+        {
+            "company_id": company_id,
+            "is_active": True,
+            "account_type": {"$in": ["asset", "liability", "equity"]}
+        },
+        {"_id": 0}
+    ).sort("account_code", 1).to_list(500)
+    
+    # Calculate balances
+    pipeline = [
+        {"$match": {"company_id": company_id, "entry_date": {"$lte": as_of_date}}},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_id",
+            "total_debit": {"$sum": {"$ifNull": ["$lines.debit_amount", 0]}},
+            "total_credit": {"$sum": {"$ifNull": ["$lines.credit_amount", 0]}}
+        }}
+    ]
+    
+    balances = await db.accounting_journal_entries.aggregate(pipeline).to_list(500)
+    balance_map = {b["_id"]: b for b in balances}
+    
+    # Also calculate retained earnings (cumulative P&L)
+    pl_pipeline = [
+        {"$match": {
+            "company_id": company_id,
+            "entry_date": {"$lte": as_of_date}
+        }},
+        {"$unwind": "$lines"},
+        {"$lookup": {
+            "from": "chart_of_accounts",
+            "localField": "lines.account_id",
+            "foreignField": "id",
+            "as": "account"
+        }},
+        {"$unwind": "$account"},
+        {"$match": {"account.account_type": {"$in": ["income", "cogs", "expense"]}}},
+        {"$group": {
+            "_id": "$account.account_type",
+            "total_debit": {"$sum": "$lines.debit_amount"},
+            "total_credit": {"$sum": "$lines.credit_amount"}
+        }}
+    ]
+    
+    pl_balances = await db.accounting_journal_entries.aggregate(pl_pipeline).to_list(10)
+    pl_map = {p["_id"]: p for p in pl_balances}
+    
+    income_balance = pl_map.get("income", {"total_debit": 0, "total_credit": 0})
+    cogs_balance = pl_map.get("cogs", {"total_debit": 0, "total_credit": 0})
+    expense_balance = pl_map.get("expense", {"total_debit": 0, "total_credit": 0})
+    
+    total_income = income_balance['total_credit'] - income_balance['total_debit']
+    total_cogs = cogs_balance['total_debit'] - cogs_balance['total_credit']
+    total_expenses = expense_balance['total_debit'] - expense_balance['total_credit']
+    retained_earnings = total_income - total_cogs - total_expenses
+    
+    # Build report sections
+    asset_items = []
+    liability_items = []
+    equity_items = []
+    
+    total_assets = 0
+    total_liabilities = 0
+    total_equity = 0
+    
+    for account in accounts:
+        if account.get('is_header'):
+            continue
+            
+        balance = balance_map.get(account['id'], {"total_debit": 0, "total_credit": 0})
+        
+        if account['account_type'] == 'asset':
+            amount = balance['total_debit'] - balance['total_credit']
+            if amount != 0:
+                asset_items.append({
+                    "account_code": account['account_code'],
+                    "account_name": account['account_name'],
+                    "amount": round(amount, 2)
+                })
+                total_assets += amount
+        elif account['account_type'] == 'liability':
+            amount = balance['total_credit'] - balance['total_debit']
+            if amount != 0:
+                liability_items.append({
+                    "account_code": account['account_code'],
+                    "account_name": account['account_name'],
+                    "amount": round(amount, 2)
+                })
+                total_liabilities += amount
+        elif account['account_type'] == 'equity':
+            # Skip retained earnings account, we calculate it
+            if 'retained' not in account['account_name'].lower():
+                amount = balance['total_credit'] - balance['total_debit']
+                if amount != 0:
+                    equity_items.append({
+                        "account_code": account['account_code'],
+                        "account_name": account['account_name'],
+                        "amount": round(amount, 2)
+                    })
+                    total_equity += amount
+    
+    # Add calculated retained earnings
+    equity_items.append({
+        "account_code": "3200",
+        "account_name": "Retained Earnings (Calculated)",
+        "amount": round(retained_earnings, 2)
+    })
+    total_equity += retained_earnings
+    
+    return {
+        "as_of_date": as_of_date,
+        "company_id": company_id,
+        "assets": {
+            "items": asset_items,
+            "total": round(total_assets, 2)
+        },
+        "liabilities": {
+            "items": liability_items,
+            "total": round(total_liabilities, 2)
+        },
+        "equity": {
+            "items": equity_items,
+            "total": round(total_equity, 2)
+        },
+        "total_liabilities_equity": round(total_liabilities + total_equity, 2),
+        "is_balanced": abs(total_assets - (total_liabilities + total_equity)) < 0.01
+    }
+
+@api_router.get("/accounting/reports/cash-flow")
+async def get_cash_flow_report(
+    start_date: str,
+    end_date: str,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Generate Cash Flow Statement (Indirect Method)"""
+    company_id = await get_user_company_id(current_user)
+    
+    # Get P&L first
+    pl_report = await get_profit_loss_report(start_date, end_date, current_user)
+    net_profit = pl_report['net_profit']
+    
+    # Get changes in working capital accounts
+    # Receivables, Payables, Inventory
+    
+    # Opening balances
+    opening_pipeline = [
+        {"$match": {"company_id": company_id, "entry_date": {"$lt": start_date}}},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_id",
+            "debit": {"$sum": "$lines.debit_amount"},
+            "credit": {"$sum": "$lines.credit_amount"}
+        }}
+    ]
+    opening_balances = await db.accounting_journal_entries.aggregate(opening_pipeline).to_list(500)
+    opening_map = {o["_id"]: o for o in opening_balances}
+    
+    # Closing balances
+    closing_pipeline = [
+        {"$match": {"company_id": company_id, "entry_date": {"$lte": end_date}}},
+        {"$unwind": "$lines"},
+        {"$group": {
+            "_id": "$lines.account_id",
+            "debit": {"$sum": "$lines.debit_amount"},
+            "credit": {"$sum": "$lines.credit_amount"}
+        }}
+    ]
+    closing_balances = await db.accounting_journal_entries.aggregate(closing_pipeline).to_list(500)
+    closing_map = {c["_id"]: c for c in closing_balances}
+    
+    # Get account settings for default accounts
+    settings = await db.account_settings.find_one({"company_id": company_id}, {"_id": 0})
+    
+    def get_balance_change(account_id, normal_balance='debit'):
+        opening = opening_map.get(account_id, {"debit": 0, "credit": 0})
+        closing = closing_map.get(account_id, {"debit": 0, "credit": 0})
+        
+        if normal_balance == 'debit':
+            open_bal = opening['debit'] - opening['credit']
+            close_bal = closing['debit'] - closing['credit']
+        else:
+            open_bal = opening['credit'] - opening['debit']
+            close_bal = closing['credit'] - closing['debit']
+        
+        return close_bal - open_bal
+    
+    # Calculate changes
+    receivable_change = -get_balance_change(settings.get('default_receivable_account_id'), 'debit') if settings else 0
+    inventory_change = -get_balance_change(settings.get('default_inventory_account_id'), 'debit') if settings else 0
+    payable_change = get_balance_change(settings.get('default_payable_account_id'), 'credit') if settings else 0
+    
+    operating_cash_flow = net_profit + receivable_change + inventory_change + payable_change
+    
+    # Get cash account change
+    cash_opening = opening_map.get(settings.get('default_cash_account_id'), {"debit": 0, "credit": 0}) if settings else {"debit": 0, "credit": 0}
+    cash_closing = closing_map.get(settings.get('default_cash_account_id'), {"debit": 0, "credit": 0}) if settings else {"debit": 0, "credit": 0}
+    
+    opening_cash = cash_opening['debit'] - cash_opening['credit']
+    closing_cash = cash_closing['debit'] - cash_closing['credit']
+    
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "company_id": company_id,
+        "operating_activities": {
+            "net_profit": round(net_profit, 2),
+            "adjustments": {
+                "change_in_receivables": round(receivable_change, 2),
+                "change_in_inventory": round(inventory_change, 2),
+                "change_in_payables": round(payable_change, 2)
+            },
+            "net_cash_from_operations": round(operating_cash_flow, 2)
+        },
+        "investing_activities": {
+            "items": [],
+            "net_cash": 0
+        },
+        "financing_activities": {
+            "items": [],
+            "net_cash": 0
+        },
+        "net_change_in_cash": round(closing_cash - opening_cash, 2),
+        "opening_cash": round(opening_cash, 2),
+        "closing_cash": round(closing_cash, 2)
+    }
+
 # ==================== SEED DATA ====================
 @api_router.post("/seed-data")
 async def seed_data(current_user: Dict = Depends(get_current_user)):
