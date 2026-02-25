@@ -57,13 +57,35 @@ export default function ExportSalesPage() {
             ) : (
               sales.map((s) => (
                 <tr key={s.id}>
-                  <td className="font-mono font-medium">{s.contract_number}</td>
-                  <td>{formatDate(s.contract_date)}</td>
+                  <td className="font-mono font-medium">{s.order_number || s.contract_number}</td>
+                  <td>{formatDate(s.order_date || s.contract_date)}</td>
                   <td className="font-medium">{s.customer_name}</td>
                   <td>{s.currency}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(s.total_amount, s.currency)}</td>
                   <td><Badge className={`${getStatusColor(s.status)} border rounded-full text-xs`}>{s.status}</Badge></td>
-                  <td><div className="flex gap-2"><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>{s.status !== 'posted' && <Button size="sm" variant="outline" onClick={() => handlePost(s.id)}><Check className="w-4 h-4 mr-1" />Post</Button>}</div></td>
+                  <td>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" data-testid={`esc-view-${s.id}`}>
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      {s.status !== 'posted' && s.status !== 'cancelled' && (
+                        <Button size="sm" variant="ghost" onClick={() => navigate(`/export-sales/${s.id}/edit`)} data-testid={`esc-edit-${s.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        const html = generateExportSalesPrintHTML(s);
+                        printDocument(html, `ESC-${s.order_number || s.contract_number}`);
+                      }} data-testid={`esc-print-${s.id}`}>
+                        <Printer className="w-4 h-4" />
+                      </Button>
+                      {s.status !== 'posted' && s.status !== 'cancelled' && (
+                        <Button size="sm" variant="outline" onClick={() => handlePost(s.id)} data-testid={`esc-post-${s.id}`}>
+                          <Check className="w-4 h-4 mr-1" />Post
+                        </Button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))
             )}
