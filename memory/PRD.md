@@ -172,6 +172,13 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] Document cancellation/reversal flow
 - [x] Trial Balance Report
 - [x] Scheduled Backups
+- [x] **Accounting Module Phase 1** - Chart of Accounts, Expenses, Income, Journal Entries, P&L, Balance Sheet
+
+### P0 - In Progress
+- [ ] **Accounting Module Phase 2** - Integrate Purchase/Sales with accounting (auto journal entries on posting)
+- [ ] **Accounting Module Phase 3** - Accounting Settings page, fiscal year management
+- [ ] **Accounting Module Phase 4** - Role-based permissions for finance operations
+- [ ] **Accounting Module Phase 5** - Data migration script for existing companies
 
 ### P1 - High Priority (Next Sprint)
 - [ ] Add international suppliers/customers to seed data
