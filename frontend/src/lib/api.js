@@ -215,8 +215,8 @@ export const accountsAPI = {
   create: (data) => api.post('/accounts', data),
 };
 
-// Journal Entries
-export const journalEntriesAPI = {
+// Journal Entries (Legacy - used for older finance module)
+export const legacyJournalEntriesAPI = {
   list: (params) => api.get('/journal-entries', { params }),
 };
 
