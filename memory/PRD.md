@@ -111,7 +111,43 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### ✅ Custom Branding
 - TechSight Innovation branding on login page and sidebar
 
-## Recent Changes (February 23, 2026)
+## Recent Changes (February 25, 2026)
+
+### New Features ✅ - Accounting Module Phase 1
+- **Chart of Accounts (COA)**: Full CRUD operations with 74 default accounts in hierarchical structure
+  - Assets, Liabilities, Equity, Income, COGS, and Expense categories
+  - Parent-child account relationships with indented tree view
+  - Filter by account type
+  - Account balance tracking
+- **Expense Management**: Record expenses with automatic journal entry generation
+  - Payment method support (Cash, Bank, Credit)
+  - Links to expense accounts
+- **Income Entry**: Manual income recording with auto journal entries
+  - Payment method support
+  - Links to income accounts  
+- **Journal Entries**: View all accounting journal entries with balanced debit/credit
+  - Entry reversal support
+  - Posted status tracking
+- **Profit & Loss Statement**: Date-filtered P&L report
+  - Income, COGS, Gross Profit, Operating Expenses, Net Profit sections
+  - Print report functionality
+- **Balance Sheet**: Point-in-time financial position report
+  - Assets, Liabilities, Equity sections
+  - Balance warning when Assets ≠ Liabilities + Equity
+  - Print report functionality
+
+### API Endpoints Added (Accounting Module)
+- `GET/POST /api/accounting/chart-of-accounts` - COA CRUD
+- `GET/PUT/DELETE /api/accounting/chart-of-accounts/{id}` - Account operations
+- `POST /api/accounting/initialize-coa` - Initialize default COA
+- `GET/POST /api/accounting/expenses` - Expense management
+- `GET/POST /api/accounting/income` - Income management  
+- `GET/POST /api/accounting/journal-entries` - Journal entries
+- `POST /api/accounting/journal-entries/{id}/reverse` - Reverse entry
+- `GET /api/accounting/reports/profit-loss` - P&L report
+- `GET /api/accounting/reports/balance-sheet` - Balance sheet report
+
+### Previous Changes (February 23, 2026)
 
 ### New Features ✅
 - **Trial Balance Report**: Shows all account balances with debit/credit totals, balanced status indicator, and PDF/Excel export
