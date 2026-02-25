@@ -5,7 +5,7 @@ import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPr
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, Loader2, Check, ShoppingCart } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, ShoppingCart, Pencil } from 'lucide-react';
 
 export default function LocalPurchasesPage() {
   const [purchases, setPurchases] = useState([]);
