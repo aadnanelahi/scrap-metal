@@ -187,6 +187,38 @@ export default function LocalPurchasesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Purchase Order</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for cancellation. This will be recorded and shown on printed documents.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="cancel-reason" className="text-sm font-medium">Cancellation Reason *</Label>
+            <Textarea
+              id="cancel-reason"
+              placeholder="Enter reason for cancellation..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="mt-2"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+              Close
+            </Button>
+            <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
+              {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Cancel PO
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
