@@ -494,7 +494,7 @@ export default function NewExportSalePage() {
 
             <div className="mt-6 space-y-3">
               <Button onClick={handleSubmit} disabled={saving} className="w-full btn-accent" data-testid="exp-save-btn">
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />Save Contract</>}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Save className="w-4 h-4 mr-2" />{isEditMode ? 'Update Contract' : 'Save Contract'}</>}
               </Button>
               <Button variant="outline" onClick={() => navigate('/export-sales')} className="w-full">Cancel</Button>
             </div>
