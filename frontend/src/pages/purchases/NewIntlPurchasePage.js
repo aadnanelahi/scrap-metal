@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { intlPurchasesAPI, suppliersAPI, branchesAPI, scrapItemsAPI, companiesAPI, incotermsAPI, portsAPI, currenciesAPI } from '../../lib/api';
 import { formatCurrency, toISODateString } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -12,6 +12,9 @@ import { ArrowLeft, Plus, Trash2, Loader2, Save, AlertCircle } from 'lucide-reac
 
 export default function NewIntlPurchasePage() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = !!id;
+  
   const [companies, setCompanies] = useState([]);
   const [branches, setBranches] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
