@@ -175,16 +175,23 @@ export default function NewLocalPurchasePage() {
     setSaving(true);
     try {
       const totals = calculateTotals();
-      await localPurchasesAPI.create({
+      const payload = {
         ...formData,
         subtotal: totals.subtotal,
         vat_amount: totals.vatAmount,
         total_amount: totals.total
-      });
-      toast.success('Local purchase order created');
+      };
+      
+      if (isEditMode) {
+        await localPurchasesAPI.update(id, payload);
+        toast.success('Purchase order updated');
+      } else {
+        await localPurchasesAPI.create(payload);
+        toast.success('Purchase order created');
+      }
       navigate('/local-purchases');
     } catch (error) {
-      const message = error.response?.data?.detail || 'Failed to create purchase order';
+      const message = error.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} purchase order`;
       toast.error(message);
     } finally {
       setSaving(false);
