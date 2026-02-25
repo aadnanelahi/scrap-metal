@@ -63,7 +63,7 @@ export default function IntlPurchasesPage() {
                   <td>{po.currency}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(po.landed_cost, po.currency)}</td>
                   <td><Badge className={`${getStatusColor(po.status)} border rounded-full text-xs`}>{po.status}</Badge></td>
-                  <td><div className="flex gap-2"><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>{po.status !== 'posted' && <Button size="sm" variant="outline" onClick={() => handlePost(po.id)}><Check className="w-4 h-4 mr-1" />Post</Button>}</div></td>
+                  <td><div className="flex gap-2"><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="ghost" onClick={() => navigate(`/intl-purchases/${po.id}/edit`)}><Pencil className="w-4 h-4" /></Button>}{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="outline" onClick={() => handlePost(po.id)}><Check className="w-4 h-4 mr-1" />Post</Button>}</div></td>
                 </tr>
               ))
             )}
