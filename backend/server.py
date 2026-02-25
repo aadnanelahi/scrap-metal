@@ -1137,8 +1137,28 @@ async def create_local_purchase(data: LocalPurchaseOrderBase, current_user: Dict
 @api_router.put("/local-purchases/{po_id}")
 async def update_local_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     existing = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
-    if existing and existing.get('status') == 'posted':
-        raise HTTPException(status_code=400, detail="Cannot edit posted document")
+    if not existing:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # If posted, only manager/admin can edit and must provide reason
+    if existing.get('status') == 'posted':
+        if current_user.get('role') not in ['admin', 'manager']:
+            raise HTTPException(status_code=403, detail="Only managers can edit posted documents")
+        if not data.get('edit_reason'):
+            raise HTTPException(status_code=400, detail="Edit reason is required for posted documents")
+        
+        # Add to edit history
+        edit_entry = {
+            "edited_at": datetime.now(timezone.utc).isoformat(),
+            "edited_by": current_user['email'],
+            "reason": data.get('edit_reason'),
+            "changes": "Document modified after posting"
+        }
+        edit_history = existing.get('edit_history', []) + [edit_entry]
+        data['edit_history'] = edit_history
+    
+    # Remove edit_reason from data before saving
+    data.pop('edit_reason', None)
     return await crud_update("local_purchases", po_id, data, current_user)
 
 @api_router.post("/local-purchases/{po_id}/post")
