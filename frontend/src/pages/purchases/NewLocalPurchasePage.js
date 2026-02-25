@@ -265,7 +265,7 @@ export default function NewLocalPurchasePage() {
         </Button>
         <div>
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">
-            New Local Purchase Order
+            {isEditMode ? 'Edit Local Purchase Order' : 'New Local Purchase Order'}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
             Create a new local purchase with VAT
