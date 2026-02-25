@@ -111,8 +111,10 @@ function AppRoutes() {
       <Route path="/local-purchases" element={<ProtectedRoute><LocalPurchasesPage /></ProtectedRoute>} />
       <Route path="/local-purchases/new" element={<ProtectedRoute><NewLocalPurchasePage /></ProtectedRoute>} />
       <Route path="/local-purchases/:id" element={<ProtectedRoute><LocalPurchaseDetailPage /></ProtectedRoute>} />
+      <Route path="/local-purchases/:id/edit" element={<ProtectedRoute><NewLocalPurchasePage /></ProtectedRoute>} />
       <Route path="/intl-purchases" element={<ProtectedRoute><IntlPurchasesPage /></ProtectedRoute>} />
       <Route path="/intl-purchases/new" element={<ProtectedRoute><NewIntlPurchasePage /></ProtectedRoute>} />
+      <Route path="/intl-purchases/:id/edit" element={<ProtectedRoute><NewIntlPurchasePage /></ProtectedRoute>} />
 
       {/* Sales */}
       <Route path="/local-sales" element={<ProtectedRoute><LocalSalesPage /></ProtectedRoute>} />
