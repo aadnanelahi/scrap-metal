@@ -68,11 +68,35 @@ export default function NewExportSalePage() {
       setPorts(portRes.data || []);
       setCurrencies(currRes.data || []);
 
-      if (compRes.data?.length > 0) {
-        setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
-      }
-      if (branchRes.data?.length > 0) {
-        setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+      if (isEditMode) {
+        const contractRes = await exportSalesAPI.get(id);
+        const contract = contractRes.data;
+        setFormData({
+          company_id: contract.company_id || '',
+          branch_id: contract.branch_id || '',
+          customer_id: contract.customer_id || '',
+          customer_name: contract.customer_name || '',
+          order_date: contract.order_date || toISODateString(new Date()),
+          delivery_date: contract.delivery_date || '',
+          currency: contract.currency || 'USD',
+          exchange_rate: contract.exchange_rate || 3.67,
+          incoterm_id: contract.incoterm_id || '',
+          port_of_loading_id: contract.port_of_loading_id || '',
+          port_of_destination_id: contract.port_of_destination_id || '',
+          shipping_line: contract.shipping_line || '',
+          container_number: contract.container_number || '',
+          bl_number: contract.bl_number || '',
+          freight_cost: contract.freight_cost || 0,
+          notes: contract.notes || '',
+          lines: contract.lines || []
+        });
+      } else {
+        if (compRes.data?.length > 0) {
+          setFormData(prev => ({ ...prev, company_id: compRes.data[0].id }));
+        }
+        if (branchRes.data?.length > 0) {
+          setFormData(prev => ({ ...prev, branch_id: branchRes.data[0].id }));
+        }
       }
     } catch (error) {
       toast.error('Failed to load data');
