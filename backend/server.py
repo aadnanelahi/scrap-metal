@@ -1276,12 +1276,32 @@ async def create_intl_purchase(data: IntlPurchaseOrderBase, current_user: Dict =
 @api_router.put("/intl-purchases/{po_id}")
 async def update_intl_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     existing = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
-    if existing and existing.get('status') == 'posted':
-        raise HTTPException(status_code=400, detail="Cannot edit posted document")
+    if not existing:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if existing.get('status') == 'posted':
+        if current_user.get('role') not in ['admin', 'manager']:
+            raise HTTPException(status_code=403, detail="Only managers can edit posted documents")
+        if not data.get('edit_reason'):
+            raise HTTPException(status_code=400, detail="Edit reason is required for posted documents")
+        
+        edit_entry = {
+            "edited_at": datetime.now(timezone.utc).isoformat(),
+            "edited_by": current_user['email'],
+            "reason": data.get('edit_reason'),
+            "changes": "Document modified after posting"
+        }
+        edit_history = existing.get('edit_history', []) + [edit_entry]
+        data['edit_history'] = edit_history
+    
+    data.pop('edit_reason', None)
     return await crud_update("intl_purchases", po_id, data, current_user)
 
 @api_router.post("/intl-purchases/{po_id}/post")
 async def post_intl_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can post documents")
+    
     po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1313,11 +1333,43 @@ async def post_intl_purchase(po_id: str, current_user: Dict = Depends(get_curren
     # Update status
     await db.intl_purchases.update_one(
         {"id": po_id},
-        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "posted",
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "posted_by": current_user['email']
+        }}
     )
     
     await log_audit(current_user['id'], current_user['email'], 'POST', 'intl_purchase', po_id)
     return {"message": "International purchase order posted"}
+
+@api_router.post("/intl-purchases/{po_id}/cancel")
+async def cancel_intl_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can cancel documents")
+    
+    if not data.get('cancellation_reason'):
+        raise HTTPException(status_code=400, detail="Cancellation reason is required")
+    
+    po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    if po.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    await db.intl_purchases.update_one(
+        {"id": po_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": data['cancellation_reason'],
+            "cancelled_by": current_user['email'],
+            "cancelled_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'intl_purchase', po_id)
+    return {"message": "International purchase order cancelled"}
 
 # ==================== LOCAL SALES ====================
 @api_router.get("/local-sales", response_model=List[Dict])
