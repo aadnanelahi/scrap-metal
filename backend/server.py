@@ -2695,7 +2695,10 @@ BACKUP_COLLECTIONS = [
     'incoterms', 'ports', 'weighbridges', 'accounts',
     'local_purchases', 'intl_purchases', 'local_sales', 'export_sales',
     'weighbridge_entries', 'inventory_stock', 'inventory_movements',
-    'journal_entries', 'payments', 'audit_logs', 'number_sequences'
+    'journal_entries', 'payments', 'audit_logs', 'number_sequences',
+    # Accounting module collections
+    'chart_of_accounts', 'accounting_journal_entries', 'expense_entries',
+    'income_entries', 'account_settings'
 ]
 
 def require_admin(current_user: Dict):
