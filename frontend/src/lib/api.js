@@ -170,7 +170,7 @@ export const localPurchasesAPI = {
   create: (data) => api.post('/local-purchases', data),
   update: (id, data) => api.put(`/local-purchases/${id}`, data),
   post: (id) => api.post(`/local-purchases/${id}/post`),
-  cancel: (id, reason) => api.post(`/local-purchases/${id}/cancel?reason=${encodeURIComponent(reason)}`),
+  cancel: (id, data) => api.post(`/local-purchases/${id}/cancel`, data),
 };
 
 // International Purchases
@@ -180,6 +180,7 @@ export const intlPurchasesAPI = {
   create: (data) => api.post('/intl-purchases', data),
   update: (id, data) => api.put(`/intl-purchases/${id}`, data),
   post: (id) => api.post(`/intl-purchases/${id}/post`),
+  cancel: (id, data) => api.post(`/intl-purchases/${id}/cancel`, data),
 };
 
 // Local Sales
@@ -189,7 +190,7 @@ export const localSalesAPI = {
   create: (data) => api.post('/local-sales', data),
   update: (id, data) => api.put(`/local-sales/${id}`, data),
   post: (id) => api.post(`/local-sales/${id}/post`),
-  cancel: (id, reason) => api.post(`/local-sales/${id}/cancel?reason=${encodeURIComponent(reason)}`),
+  cancel: (id, data) => api.post(`/local-sales/${id}/cancel`, data),
 };
 
 // Export Sales
@@ -199,6 +200,7 @@ export const exportSalesAPI = {
   create: (data) => api.post('/export-sales', data),
   update: (id, data) => api.put(`/export-sales/${id}`, data),
   post: (id) => api.post(`/export-sales/${id}/post`),
+  cancel: (id, data) => api.post(`/export-sales/${id}/cancel`, data),
 };
 
 // Inventory
