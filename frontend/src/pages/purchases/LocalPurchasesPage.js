@@ -108,6 +108,11 @@ export default function LocalPurchasesPage() {
                       <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}`)} data-testid={`lpo-view-btn-${po.id}`}>
                         <Eye className="w-4 h-4" />
                       </Button>
+                      {po.status !== 'posted' && po.status !== 'cancelled' && (
+                        <Button size="sm" variant="ghost" onClick={() => navigate(`/local-purchases/${po.id}/edit`)} data-testid={`lpo-edit-btn-${po.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => {
                         const html = generatePOPrintHTML(po);
                         printDocument(html, `PO-${po.order_number}`);
