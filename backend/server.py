@@ -392,6 +392,11 @@ class IntlPurchaseOrder(IntlPurchaseOrderBase):
     created_by: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     posted_at: Optional[datetime] = None
+    posted_by: Optional[str] = None
+    cancellation_reason: Optional[str] = None
+    cancelled_by: Optional[str] = None
+    cancelled_at: Optional[datetime] = None
+    edit_history: List[Dict] = []
 
 # ==================== SALES MODELS ====================
 class SalesOrderLineBase(BaseModel):
