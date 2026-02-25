@@ -1422,12 +1422,32 @@ async def create_local_sale(data: LocalSalesOrderBase, current_user: Dict = Depe
 @api_router.put("/local-sales/{so_id}")
 async def update_local_sale(so_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     existing = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
-    if existing and existing.get('status') == 'posted':
-        raise HTTPException(status_code=400, detail="Cannot edit posted document")
+    if not existing:
+        raise HTTPException(status_code=404, detail="Sales order not found")
+    
+    if existing.get('status') == 'posted':
+        if current_user.get('role') not in ['admin', 'manager']:
+            raise HTTPException(status_code=403, detail="Only managers can edit posted documents")
+        if not data.get('edit_reason'):
+            raise HTTPException(status_code=400, detail="Edit reason is required for posted documents")
+        
+        edit_entry = {
+            "edited_at": datetime.now(timezone.utc).isoformat(),
+            "edited_by": current_user['email'],
+            "reason": data.get('edit_reason'),
+            "changes": "Document modified after posting"
+        }
+        edit_history = existing.get('edit_history', []) + [edit_entry]
+        data['edit_history'] = edit_history
+    
+    data.pop('edit_reason', None)
     return await crud_update("local_sales", so_id, data, current_user)
 
 @api_router.post("/local-sales/{so_id}/post")
 async def post_local_sale(so_id: str, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can post documents")
+    
     so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not so:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -1468,11 +1488,43 @@ async def post_local_sale(so_id: str, current_user: Dict = Depends(get_current_u
     # Update status
     await db.local_sales.update_one(
         {"id": so_id},
-        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "posted",
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "posted_by": current_user['email']
+        }}
     )
     
     await log_audit(current_user['id'], current_user['email'], 'POST', 'local_sale', so_id)
     return {"message": "Sales order posted"}
+
+@api_router.post("/local-sales/{so_id}/cancel")
+async def cancel_local_sale(so_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can cancel documents")
+    
+    if not data.get('cancellation_reason'):
+        raise HTTPException(status_code=400, detail="Cancellation reason is required")
+    
+    so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
+    if not so:
+        raise HTTPException(status_code=404, detail="Sales order not found")
+    
+    if so.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    await db.local_sales.update_one(
+        {"id": so_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": data['cancellation_reason'],
+            "cancelled_by": current_user['email'],
+            "cancelled_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_sale', so_id)
+    return {"message": "Sales order cancelled"}
 
 # ==================== EXPORT SALES ====================
 @api_router.get("/export-sales", response_model=List[Dict])
