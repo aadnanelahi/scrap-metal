@@ -1567,12 +1567,32 @@ async def create_export_sale(data: ExportSalesContractBase, current_user: Dict =
 @api_router.put("/export-sales/{contract_id}")
 async def update_export_sale(contract_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     existing = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
-    if existing and existing.get('status') == 'posted':
-        raise HTTPException(status_code=400, detail="Cannot edit posted document")
+    if not existing:
+        raise HTTPException(status_code=404, detail="Export contract not found")
+    
+    if existing.get('status') == 'posted':
+        if current_user.get('role') not in ['admin', 'manager']:
+            raise HTTPException(status_code=403, detail="Only managers can edit posted documents")
+        if not data.get('edit_reason'):
+            raise HTTPException(status_code=400, detail="Edit reason is required for posted documents")
+        
+        edit_entry = {
+            "edited_at": datetime.now(timezone.utc).isoformat(),
+            "edited_by": current_user['email'],
+            "reason": data.get('edit_reason'),
+            "changes": "Document modified after posting"
+        }
+        edit_history = existing.get('edit_history', []) + [edit_entry]
+        data['edit_history'] = edit_history
+    
+    data.pop('edit_reason', None)
     return await crud_update("export_sales", contract_id, data, current_user)
 
 @api_router.post("/export-sales/{contract_id}/post")
 async def post_export_sale(contract_id: str, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can post documents")
+    
     contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
     if not contract:
         raise HTTPException(status_code=404, detail="Export contract not found")
@@ -1604,7 +1624,7 @@ async def post_export_sale(contract_id: str, current_user: Dict = Depends(get_cu
             movement_type='OUT',
             reference_type='export_sale',
             reference_id=contract_id,
-            reference_number=contract['contract_number']
+            reference_number=contract.get('order_number') or contract.get('contract_number')
         )
     
     # Create journal entry
@@ -1613,11 +1633,43 @@ async def post_export_sale(contract_id: str, current_user: Dict = Depends(get_cu
     # Update status
     await db.export_sales.update_one(
         {"id": contract_id},
-        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "posted",
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "posted_by": current_user['email']
+        }}
     )
     
     await log_audit(current_user['id'], current_user['email'], 'POST', 'export_sale', contract_id)
     return {"message": "Export contract posted"}
+
+@api_router.post("/export-sales/{contract_id}/cancel")
+async def cancel_export_sale(contract_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    if current_user.get('role') not in ['admin', 'manager']:
+        raise HTTPException(status_code=403, detail="Only managers can cancel documents")
+    
+    if not data.get('cancellation_reason'):
+        raise HTTPException(status_code=400, detail="Cancellation reason is required")
+    
+    contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Export contract not found")
+    
+    if contract.get('status') == 'cancelled':
+        raise HTTPException(status_code=400, detail="Already cancelled")
+    
+    await db.export_sales.update_one(
+        {"id": contract_id},
+        {"$set": {
+            "status": "cancelled",
+            "cancellation_reason": data['cancellation_reason'],
+            "cancelled_by": current_user['email'],
+            "cancelled_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'export_sale', contract_id)
+    return {"message": "Export contract cancelled"}
 
 # ==================== INVENTORY FUNCTIONS ====================
 async def update_inventory(item_id: str, item_name: str, branch_id: str, quantity: float, 
