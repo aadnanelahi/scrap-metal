@@ -534,7 +534,7 @@ export default function NewLocalPurchasePage() {
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    Save Purchase Order
+                    {isEditMode ? 'Update Purchase Order' : 'Save Purchase Order'}
                   </>
                 )}
               </Button>
