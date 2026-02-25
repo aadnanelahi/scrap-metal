@@ -6,7 +6,7 @@ No internet required for daily use.
 
 INSTALLATION (5 commands):
 
-1. wget https://scrapos-erp-preview.preview.emergentagent.com/scrapos-erp-offline.tar.gz
+1. wget https://journal-ledger.preview.emergentagent.com/scrapos-erp-offline.tar.gz
 2. tar -xzvf scrapos-erp-offline.tar.gz
 3. cd scrapos-installer
 4. chmod +x install.sh

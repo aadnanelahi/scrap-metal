@@ -33,7 +33,7 @@ STEP 2: DOWNLOAD THE PACKAGE
 ─────────────────────────────────────────────────────────────────────────────────
   Copy and paste this command, then press ENTER:
 
-  wget https://scrapos-erp-preview.preview.emergentagent.com/scrapos-erp-offline.tar.gz
+  wget https://journal-ledger.preview.emergentagent.com/scrapos-erp-offline.tar.gz
 
 
 STEP 3: EXTRACT THE PACKAGE
@@ -85,7 +85,7 @@ STEP 7: INSTALLATION COMPLETE!
 
   Copy these one by one:
 
-  wget https://scrapos-erp-preview.preview.emergentagent.com/scrapos-erp-offline.tar.gz
+  wget https://journal-ledger.preview.emergentagent.com/scrapos-erp-offline.tar.gz
   tar -xzvf scrapos-erp-offline.tar.gz
   cd scrapos-installer
   chmod +x install.sh
