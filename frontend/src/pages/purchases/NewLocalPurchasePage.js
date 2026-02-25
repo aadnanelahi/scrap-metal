@@ -453,14 +453,13 @@ export default function NewLocalPurchasePage() {
                     <div className="col-span-3">
                       <Label className="form-label text-xs">Item</Label>
                       <Select
-                        value={line.item_id || "select"}
-                        onValueChange={(value) => updateLine(index, 'item_id', value === "select" ? "" : value)}
+                        value={line.item_id || ""}
+                        onValueChange={(value) => updateLine(index, 'item_id', value)}
                       >
                         <SelectTrigger className="form-input h-9" data-testid={`lpo-line-item-${index}`}>
-                          <SelectValue placeholder="Select" />
+                          <SelectValue placeholder="Select Item" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="select" disabled>Select Item</SelectItem>
                           {items.map((i) => (
                             <SelectItem key={i.id} value={i.id}>{i.name}</SelectItem>
                           ))}
