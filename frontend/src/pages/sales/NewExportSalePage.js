@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { exportSalesAPI, customersAPI, branchesAPI, scrapItemsAPI, companiesAPI, incotermsAPI, portsAPI, currenciesAPI } from '../../lib/api';
 import { formatCurrency, toISODateString } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -12,6 +12,9 @@ import { ArrowLeft, Plus, Trash2, Loader2, Save, AlertCircle } from 'lucide-reac
 
 export default function NewExportSalePage() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = !!id;
+  
   const [companies, setCompanies] = useState([]);
   const [branches, setBranches] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -27,8 +30,8 @@ export default function NewExportSalePage() {
     branch_id: '',
     customer_id: '',
     customer_name: '',
-    contract_date: toISODateString(new Date()),
-    shipment_date: '',
+    order_date: toISODateString(new Date()),
+    delivery_date: '',
     currency: 'USD',
     exchange_rate: 3.67,
     incoterm_id: '',
