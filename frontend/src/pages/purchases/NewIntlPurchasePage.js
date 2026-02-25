@@ -264,10 +264,10 @@ export default function NewIntlPurchasePage() {
         </Button>
         <div>
           <h1 className="text-2xl font-manrope font-bold text-slate-900 dark:text-white">
-            New International Purchase Order
+            {isEditMode ? 'Edit International Purchase Order' : 'New International Purchase Order'}
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Create import order with landed cost calculation
+            {isEditMode ? 'Update import order details' : 'Create import order with landed cost calculation'}
           </p>
         </div>
       </div>
