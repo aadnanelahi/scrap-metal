@@ -195,11 +195,36 @@ export default function NewLocalPurchasePage() {
     setSaving(true);
     try {
       const totals = calculateTotals();
+      
+      // Build clean payload without any potential DOM references
+      const cleanLines = formData.lines.map(line => ({
+        item_id: line.item_id,
+        item_name: line.item_name,
+        quantity: parseFloat(line.quantity) || 0,
+        unit: line.unit || 'MT',
+        unit_price: parseFloat(line.unit_price) || 0,
+        vat_code_id: line.vat_code_id || null,
+        vat_rate: parseFloat(line.vat_rate) || 0,
+        vat_amount: parseFloat(line.vat_amount) || 0,
+        line_total: parseFloat(line.line_total) || 0
+      }));
+      
       const payload = {
-        ...formData,
+        company_id: formData.company_id,
+        branch_id: formData.branch_id,
+        supplier_id: formData.supplier_id,
+        supplier_name: formData.supplier_name,
+        order_date: formData.order_date,
+        expected_date: formData.expected_date || null,
+        broker_id: formData.broker_id || null,
+        broker_commission_type: formData.broker_commission_type || null,
+        broker_commission_rate: parseFloat(formData.broker_commission_rate) || 0,
+        currency: formData.currency || 'AED',
+        notes: formData.notes || null,
         subtotal: totals.subtotal,
         vat_amount: totals.vatAmount,
-        total_amount: totals.total
+        total_amount: totals.total,
+        lines: cleanLines
       };
       
       // Add edit reason for posted documents
