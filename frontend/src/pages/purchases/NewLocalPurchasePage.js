@@ -583,7 +583,7 @@ export default function NewLocalPurchasePage() {
 
             <div className="mt-6 space-y-3">
               <Button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
                 disabled={saving}
                 className="w-full btn-accent"
                 data-testid="lpo-save-btn"
