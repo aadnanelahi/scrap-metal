@@ -207,8 +207,6 @@ export default function NewLocalPurchasePage() {
         payload.edit_reason = reasonForEdit;
       }
       
-      console.log('Submitting PO payload:', JSON.stringify(payload, null, 2));
-      
       if (isEditMode) {
         await localPurchasesAPI.update(id, payload);
         toast.success('Purchase order updated');
@@ -218,8 +216,7 @@ export default function NewLocalPurchasePage() {
       }
       navigate('/local-purchases');
     } catch (error) {
-      console.error('PO creation error:', error);
-      console.error('Error response:', error.response?.data);
+      console.error('PO creation error:', error.message);
       const message = error.response?.data?.detail || `Failed to ${isEditMode ? 'update' : 'create'} purchase order`;
       toast.error(message);
     } finally {
