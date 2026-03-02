@@ -366,16 +366,30 @@ REACT_APP_COMPANY_NAME=$($Script:Config.CompanyName)
     $requirementsPath = Join-Path $backendPath "requirements.txt"
     if (Test-Path $requirementsPath) {
         & python -m pip install --upgrade pip
-        & python -m pip install -r $requirementsPath
+        
+        # Install emergentintegrations from private index
+        Write-Info "Installing emergentintegrations..."
+        & python -m pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -ErrorAction SilentlyContinue
+        
+        # Install other dependencies (skip emergentintegrations if in requirements.txt)
+        $tempReq = Join-Path $env:TEMP "requirements_filtered.txt"
+        Get-Content $requirementsPath | Where-Object { $_ -notmatch "emergentintegrations" } | Set-Content $tempReq
+        & python -m pip install -r $tempReq
     }
     
     # Install Node dependencies and build frontend
-    Write-Info "Installing Node.js dependencies..."
-    Push-Location $frontendPath
-    & npm install
-    Write-Info "Building frontend for production..."
-    & npm run build
-    Pop-Location
+    # The frontend build is already included, so we skip npm install/build
+    # Only needed if source code is modified
+    $frontendBuildPath = Join-Path $frontendPath "build"
+    if (-not (Test-Path $frontendBuildPath)) {
+        Write-Info "Building frontend (this may take a few minutes)..."
+        Push-Location $frontendPath
+        & npm install --legacy-peer-deps
+        & npm run build
+        Pop-Location
+    } else {
+        Write-Info "Frontend build already exists, skipping build step"
+    }
 }
 
 # =============================================================================
