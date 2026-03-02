@@ -231,38 +231,53 @@ function Install-Dependencies {
         Write-Info "Installing IIS features..."
         
         # Install IIS
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart -ErrorAction SilentlyContinue
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart -ErrorAction SilentlyContinue
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue | Out-Null
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue | Out-Null
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart -ErrorAction SilentlyContinue | Out-Null
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart -ErrorAction SilentlyContinue | Out-Null
         
-        # Check if URL Rewrite is already installed
-        $urlRewriteInstalled = Test-Path "C:\Program Files\IIS\Url Rewrite Module 2\rewrite.dll" -ErrorAction SilentlyContinue
+        # Check if URL Rewrite is already installed (multiple locations)
+        $urlRewriteInstalled = $false
+        $urlRewritePaths = @(
+            "C:\Program Files\IIS\Url Rewrite Module 2\rewrite.dll",
+            "C:\Windows\System32\inetsrv\rewrite.dll",
+            "C:\Program Files\IIS\URL Rewrite\rewrite.dll"
+        )
+        foreach ($path in $urlRewritePaths) {
+            if (Test-Path $path) {
+                $urlRewriteInstalled = $true
+                break
+            }
+        }
+        
+        # Also check registry
         if (-not $urlRewriteInstalled) {
-            $urlRewriteInstalled = Test-Path "C:\Windows\System32\inetsrv\rewrite.dll" -ErrorAction SilentlyContinue
+            $regPath = "HKLM:\SOFTWARE\Microsoft\IIS Extensions\URL Rewrite"
+            if (Test-Path $regPath) {
+                $urlRewriteInstalled = $true
+            }
         }
         
         if (-not $urlRewriteInstalled) {
             Write-Info "Installing URL Rewrite module..."
+            # Try direct MSI download (more reliable than chocolatey)
+            $urlRewriteInstaller = "$env:TEMP\urlrewrite.msi"
             try {
-                choco install urlrewrite -y --no-progress --ignore-checksums -ErrorAction SilentlyContinue
+                Invoke-WebRequest -Uri "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" -OutFile $urlRewriteInstaller -UseBasicParsing
+                $process = Start-Process msiexec.exe -Wait -PassThru -ArgumentList "/i `"$urlRewriteInstaller`" /quiet /norestart"
+                if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 1603) {
+                    Write-Warning "URL Rewrite MSI returned exit code: $($process.ExitCode)"
+                }
             } catch {
-                Write-Warning "URL Rewrite installation via Chocolatey failed. Trying direct download..."
-                $urlRewriteInstaller = "$env:TEMP\urlrewrite.msi"
-                Invoke-WebRequest -Uri "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" -OutFile $urlRewriteInstaller -ErrorAction SilentlyContinue
-                Start-Process msiexec.exe -Wait -ArgumentList "/i `"$urlRewriteInstaller`" /quiet" -ErrorAction SilentlyContinue
+                Write-Warning "Could not install URL Rewrite: $_"
             }
         } else {
-            Write-Info "URL Rewrite module already installed"
+            Write-Info "URL Rewrite module already installed - skipping"
         }
         
-        # Install ARR (Application Request Routing) for reverse proxy - optional
-        Write-Info "Checking ARR (Application Request Routing)..."
-        try {
-            choco install iis-arr -y --no-progress -ErrorAction SilentlyContinue
-        } catch {
-            Write-Warning "ARR installation skipped. You may need to configure reverse proxy manually."
-        }
+        # ARR is optional - skip if URL Rewrite had issues
+        Write-Info "Note: ARR (Application Request Routing) installation skipped."
+        Write-Info "The reverse proxy will be configured using URL Rewrite rules instead."
     }
 }
 
