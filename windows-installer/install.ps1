@@ -363,18 +363,19 @@ REACT_APP_COMPANY_NAME=$($Script:Config.CompanyName)
     
     # Install Python dependencies
     Write-Info "Installing Python dependencies..."
-    $requirementsPath = Join-Path $backendPath "requirements.txt"
-    if (Test-Path $requirementsPath) {
-        & python -m pip install --upgrade pip
-        
-        # Install emergentintegrations from private index
-        Write-Info "Installing emergentintegrations..."
-        & python -m pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ -ErrorAction SilentlyContinue
-        
-        # Install other dependencies (skip emergentintegrations if in requirements.txt)
-        $tempReq = Join-Path $env:TEMP "requirements_filtered.txt"
-        Get-Content $requirementsPath | Where-Object { $_ -notmatch "emergentintegrations" } | Set-Content $tempReq
-        & python -m pip install -r $tempReq
+    $backendPath = Join-Path $Script:Config.InstallPath "backend"
+    
+    # Install core dependencies (simplified list to avoid conflicts)
+    Write-Info "Installing core Python packages..."
+    & python -m pip install --upgrade pip
+    & python -m pip install fastapi uvicorn[standard] motor pydantic[email] python-jose[cryptography] passlib[bcrypt] python-multipart python-dotenv httpx apscheduler openpyxl reportlab
+    
+    # Install emergentintegrations from private index (optional, skip if fails)
+    Write-Info "Installing emergentintegrations (optional)..."
+    try {
+        & python -m pip install emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/ 2>$null
+    } catch {
+        Write-Warning "emergentintegrations not available. Some features may be limited."
     }
     
     # Install Node dependencies and build frontend

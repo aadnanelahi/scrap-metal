@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+motor
+pydantic[email]
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+python-dotenv
+httpx
+apscheduler
+openpyxl
+reportlab
