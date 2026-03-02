@@ -228,24 +228,41 @@ function Install-Dependencies {
     
     # Install IIS if selected
     if ($Script:Config.UseIIS) {
-        Write-Info "Installing IIS and URL Rewrite module..."
+        Write-Info "Installing IIS features..."
         
         # Install IIS
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart
-        Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole -All -NoRestart -ErrorAction SilentlyContinue
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer -All -NoRestart -ErrorAction SilentlyContinue
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-ManagementConsole -All -NoRestart -ErrorAction SilentlyContinue
+        Enable-WindowsOptionalFeature -Online -FeatureName IIS-HttpRedirect -All -NoRestart -ErrorAction SilentlyContinue
         
-        # Install URL Rewrite module
-        $urlRewriteInstaller = "$env:TEMP\urlrewrite.msi"
-        if (-not (Test-Path "C:\Program Files\IIS\URL Rewrite\rewrite.dll" -ErrorAction SilentlyContinue)) {
-            Write-Info "Downloading URL Rewrite module..."
-            Invoke-WebRequest -Uri "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" -OutFile $urlRewriteInstaller
-            Start-Process msiexec.exe -Wait -ArgumentList "/i `"$urlRewriteInstaller`" /quiet"
+        # Check if URL Rewrite is already installed
+        $urlRewriteInstalled = Test-Path "C:\Program Files\IIS\Url Rewrite Module 2\rewrite.dll" -ErrorAction SilentlyContinue
+        if (-not $urlRewriteInstalled) {
+            $urlRewriteInstalled = Test-Path "C:\Windows\System32\inetsrv\rewrite.dll" -ErrorAction SilentlyContinue
         }
         
-        # Install ARR (Application Request Routing) for reverse proxy
-        choco install iis-arr -y --no-progress -ErrorAction SilentlyContinue
+        if (-not $urlRewriteInstalled) {
+            Write-Info "Installing URL Rewrite module..."
+            try {
+                choco install urlrewrite -y --no-progress --ignore-checksums -ErrorAction SilentlyContinue
+            } catch {
+                Write-Warning "URL Rewrite installation via Chocolatey failed. Trying direct download..."
+                $urlRewriteInstaller = "$env:TEMP\urlrewrite.msi"
+                Invoke-WebRequest -Uri "https://download.microsoft.com/download/1/2/8/128E2E22-C1B9-44A4-BE2A-5859ED1D4592/rewrite_amd64_en-US.msi" -OutFile $urlRewriteInstaller -ErrorAction SilentlyContinue
+                Start-Process msiexec.exe -Wait -ArgumentList "/i `"$urlRewriteInstaller`" /quiet" -ErrorAction SilentlyContinue
+            }
+        } else {
+            Write-Info "URL Rewrite module already installed"
+        }
+        
+        # Install ARR (Application Request Routing) for reverse proxy - optional
+        Write-Info "Checking ARR (Application Request Routing)..."
+        try {
+            choco install iis-arr -y --no-progress -ErrorAction SilentlyContinue
+        } catch {
+            Write-Warning "ARR installation skipped. You may need to configure reverse proxy manually."
+        }
     }
 }
 
@@ -258,32 +275,43 @@ function Copy-ApplicationFiles {
     $backendDest = Join-Path $Script:Config.InstallPath "backend"
     $frontendDest = Join-Path $Script:Config.InstallPath "frontend"
     
-    # Copy backend
-    Write-Info "Copying backend files..."
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-    $sourceBackend = Join-Path $scriptDir "app\backend"
+    # Get the script's directory
+    $scriptDir = $PSScriptRoot
+    if (-not $scriptDir) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if (-not $scriptDir) {
+        $scriptDir = Get-Location
+    }
     
+    Write-Info "Script directory: $scriptDir"
+    
+    # Look for app folder in script directory
+    $sourceBackend = Join-Path $scriptDir "app\backend"
+    $sourceFrontend = Join-Path $scriptDir "app\frontend"
+    
+    # Copy backend
+    Write-Info "Looking for backend at: $sourceBackend"
     if (Test-Path $sourceBackend) {
+        Write-Info "Copying backend files..."
         Copy-Item -Path $sourceBackend -Destination $backendDest -Recurse -Force
+        Write-Info "Backend copied to: $backendDest"
     } else {
-        # If running from repo, copy from parent
-        $repoBackend = Join-Path (Split-Path -Parent $scriptDir) "backend"
-        if (Test-Path $repoBackend) {
-            Copy-Item -Path $repoBackend -Destination $backendDest -Recurse -Force
-        }
+        Write-Error "Backend source not found at: $sourceBackend"
+        Write-Info "Please ensure the 'app\backend' folder exists in the installer directory"
+        throw "Backend source not found"
     }
     
     # Copy frontend
-    Write-Info "Copying frontend files..."
-    $sourceFrontend = Join-Path $scriptDir "app\frontend"
-    
+    Write-Info "Looking for frontend at: $sourceFrontend"
     if (Test-Path $sourceFrontend) {
+        Write-Info "Copying frontend files..."
         Copy-Item -Path $sourceFrontend -Destination $frontendDest -Recurse -Force
+        Write-Info "Frontend copied to: $frontendDest"
     } else {
-        $repoFrontend = Join-Path (Split-Path -Parent $scriptDir) "frontend"
-        if (Test-Path $repoFrontend) {
-            Copy-Item -Path $repoFrontend -Destination $frontendDest -Recurse -Force
-        }
+        Write-Error "Frontend source not found at: $sourceFrontend"
+        Write-Info "Please ensure the 'app\frontend' folder exists in the installer directory"
+        throw "Frontend source not found"
     }
     
     Write-Info "Application files copied successfully"
