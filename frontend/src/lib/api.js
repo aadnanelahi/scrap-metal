@@ -285,6 +285,8 @@ export const accountingReportsAPI = {
   profitLoss: (params) => api.get('/accounting/reports/profit-loss', { params }),
   balanceSheet: (params) => api.get('/accounting/reports/balance-sheet', { params }),
   cashFlow: (params) => api.get('/accounting/reports/cash-flow', { params }),
+  receivables: (params) => api.get('/accounting/reports/receivables', { params }),
+  payables: (params) => api.get('/accounting/reports/payables', { params }),
 };
 
 // Seed Data

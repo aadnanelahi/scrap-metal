@@ -1775,45 +1775,151 @@ async def get_inventory_movements(
 
 # ==================== ACCOUNTING FUNCTIONS ====================
 async def create_purchase_journal_entry(po: Dict, po_type: str):
-    entry_number = await generate_number("JE", "journal_entries", "entry_number")
+    """Create accounting journal entry when PO is posted"""
+    company_id = po.get('company_id')
+    if not company_id:
+        return  # Skip if no company_id
     
-    if po_type == 'local':
-        lines = [
-            {"account_code": "1200", "account_name": "Inventory", "debit": po['subtotal'], "credit": 0},
-            {"account_code": "1300", "account_name": "VAT Input", "debit": po['vat_amount'], "credit": 0},
-            {"account_code": "2100", "account_name": "Accounts Payable", "debit": 0, "credit": po['total_amount']}
-        ]
-        if po.get('broker_commission', 0) > 0:
-            lines.append({"account_code": "5200", "account_name": "Broker Commission Expense", "debit": po['broker_commission'], "credit": 0})
-            lines.append({"account_code": "2200", "account_name": "Broker Payable", "debit": 0, "credit": po['broker_commission']})
-    else:  # intl
-        lines = [
-            {"account_code": "1200", "account_name": "Inventory", "debit": po['landed_cost'], "credit": 0},
-            {"account_code": "2100", "account_name": "Accounts Payable", "debit": 0, "credit": po['total_amount']}
-        ]
+    # Get account IDs from Chart of Accounts
+    inventory_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1300"}, {"_id": 0}
+    )
+    vat_input_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1350"}, {"_id": 0}
+    )
+    ap_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "2100"}, {"_id": 0}
+    )
     
-    total_debit = sum(l['debit'] for l in lines)
-    total_credit = sum(l['credit'] for l in lines)
+    # Use defaults if not found
+    inventory_id = inventory_account['id'] if inventory_account else None
+    vat_input_id = vat_input_account['id'] if vat_input_account else None
+    ap_id = ap_account['id'] if ap_account else None
     
-    entry = JournalEntry(
+    entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    
+    lines = []
+    
+    # Debit: Inventory
+    if po.get('subtotal', 0) > 0:
+        lines.append({
+            "account_id": inventory_id,
+            "account_code": "1300",
+            "account_name": "Inventory - Scrap Metal",
+            "description": f"Purchase from {po.get('supplier_name', '')}",
+            "debit_amount": float(po.get('subtotal', 0)),
+            "credit_amount": 0
+        })
+    
+    # Debit: VAT Input (if any)
+    if po.get('vat_amount', 0) > 0:
+        lines.append({
+            "account_id": vat_input_id,
+            "account_code": "1350",
+            "account_name": "VAT Receivable (Input)",
+            "description": f"VAT on purchase {po.get('order_number', '')}",
+            "debit_amount": float(po.get('vat_amount', 0)),
+            "credit_amount": 0
+        })
+    
+    # Credit: Accounts Payable
+    total_credit = float(po.get('total_amount', 0))
+    lines.append({
+        "account_id": ap_id,
+        "account_code": "2100",
+        "account_name": "Accounts Payable - Trade",
+        "description": f"Payable to {po.get('supplier_name', '')}",
+        "debit_amount": 0,
+        "credit_amount": total_credit
+    })
+    
+    # Handle broker commission if any
+    if po.get('broker_commission', 0) > 0:
+        broker_exp_account = await db.chart_of_accounts.find_one(
+            {"company_id": company_id, "account_code": "6220"}, {"_id": 0}
+        )
+        lines.append({
+            "account_id": broker_exp_account['id'] if broker_exp_account else None,
+            "account_code": "6220",
+            "account_name": "Commission Expense",
+            "description": f"Broker commission for {po.get('order_number', '')}",
+            "debit_amount": float(po.get('broker_commission', 0)),
+            "credit_amount": 0
+        })
+        lines.append({
+            "account_id": ap_id,
+            "account_code": "2100",
+            "account_name": "Accounts Payable - Trade",
+            "description": f"Broker commission payable",
+            "debit_amount": 0,
+            "credit_amount": float(po.get('broker_commission', 0))
+        })
+    
+    total_debit = sum(l['debit_amount'] for l in lines)
+    total_credit = sum(l['credit_amount'] for l in lines)
+    
+    entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "entry_date": po.get('order_date', datetime.now(timezone.utc).strftime('%Y-%m-%d')),
+        "reference_type": f"{po_type}_purchase",
+        "reference_id": po['id'],
+        "reference_number": po.get('order_number', ''),
+        "description": f"Purchase from {po.get('supplier_name', '')} - {po.get('order_number', '')}",
+        "lines": lines,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "status": "posted",
+        "created_by": po.get('created_by', ''),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "auto_purchase"
+    }
+    
+    await db.accounting_journal_entries.insert_one(entry)
+    
+    # Also create in legacy journal_entries for backward compatibility
+    legacy_entry = JournalEntry(
         entry_number=entry_number,
-        entry_date=po['order_date'],
+        entry_date=po.get('order_date', ''),
         reference_type=f"{po_type}_purchase",
         reference_id=po['id'],
-        reference_number=po['order_number'],
-        description=f"Purchase from {po['supplier_name']}",
-        lines=lines,
+        reference_number=po.get('order_number', ''),
+        description=f"Purchase from {po.get('supplier_name', '')}",
+        lines=[{"account_code": l['account_code'], "account_name": l['account_name'], 
+                "debit": l['debit_amount'], "credit": l['credit_amount']} for l in lines],
         total_debit=total_debit,
         total_credit=total_credit,
         created_by=po.get('created_by')
     )
-    
-    doc = entry.model_dump()
+    doc = legacy_entry.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.journal_entries.insert_one(doc)
 
 async def create_sales_journal_entry(so: Dict, so_type: str):
-    entry_number = await generate_number("JE", "journal_entries", "entry_number")
+    """Create accounting journal entry when SO is posted"""
+    company_id = so.get('company_id')
+    if not company_id:
+        return  # Skip if no company_id
+    
+    # Get account IDs from Chart of Accounts
+    ar_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1200"}, {"_id": 0}
+    )
+    sales_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "4100"}, {"_id": 0}
+    )
+    vat_output_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "2200"}, {"_id": 0}
+    )
+    cogs_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "5100"}, {"_id": 0}
+    )
+    inventory_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1300"}, {"_id": 0}
+    )
+    
+    entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
     
     # Calculate COGS
     cogs = 0
@@ -1825,45 +1931,130 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
         if stock:
             cogs += line['quantity'] * stock.get('avg_cost', 0)
     
-    if so_type == 'local':
-        lines = [
-            {"account_code": "1100", "account_name": "Accounts Receivable", "debit": so['total_amount'], "credit": 0},
-            {"account_code": "4100", "account_name": "Sales Revenue", "debit": 0, "credit": so['subtotal']},
-            {"account_code": "2300", "account_name": "VAT Output", "debit": 0, "credit": so['vat_amount']},
-            {"account_code": "5100", "account_name": "Cost of Goods Sold", "debit": cogs, "credit": 0},
-            {"account_code": "1200", "account_name": "Inventory", "debit": 0, "credit": cogs}
-        ]
-        if so.get('broker_commission', 0) > 0:
-            lines.append({"account_code": "5200", "account_name": "Broker Commission Expense", "debit": so['broker_commission'], "credit": 0})
-            lines.append({"account_code": "2200", "account_name": "Broker Payable", "debit": 0, "credit": so['broker_commission']})
-    else:  # export (zero-rated VAT)
-        lines = [
-            {"account_code": "1100", "account_name": "Accounts Receivable", "debit": so['total_amount'], "credit": 0},
-            {"account_code": "4100", "account_name": "Sales Revenue", "debit": 0, "credit": so['subtotal']},
-            {"account_code": "5100", "account_name": "Cost of Goods Sold", "debit": cogs, "credit": 0},
-            {"account_code": "1200", "account_name": "Inventory", "debit": 0, "credit": cogs}
-        ]
-    
-    total_debit = sum(l['debit'] for l in lines)
-    total_credit = sum(l['credit'] for l in lines)
-    
     customer_name = so.get('customer_name', '')
     ref_number = so.get('order_number', so.get('contract_number', ''))
     
-    entry = JournalEntry(
+    lines = []
+    
+    # Debit: Accounts Receivable
+    total_amount = float(so.get('total_amount', 0))
+    lines.append({
+        "account_id": ar_account['id'] if ar_account else None,
+        "account_code": "1200",
+        "account_name": "Accounts Receivable - Trade",
+        "description": f"Receivable from {customer_name}",
+        "debit_amount": total_amount,
+        "credit_amount": 0
+    })
+    
+    # Credit: Sales Revenue
+    subtotal = float(so.get('subtotal', 0))
+    lines.append({
+        "account_id": sales_account['id'] if sales_account else None,
+        "account_code": "4100",
+        "account_name": "Sales Revenue - Scrap Metal",
+        "description": f"Sale to {customer_name}",
+        "debit_amount": 0,
+        "credit_amount": subtotal
+    })
+    
+    # Credit: VAT Output (if any - skip for exports)
+    vat_amount = float(so.get('vat_amount', 0))
+    if vat_amount > 0 and so_type == 'local':
+        lines.append({
+            "account_id": vat_output_account['id'] if vat_output_account else None,
+            "account_code": "2200",
+            "account_name": "VAT Payable (Output)",
+            "description": f"VAT on sale {ref_number}",
+            "debit_amount": 0,
+            "credit_amount": vat_amount
+        })
+    
+    # COGS entries
+    if cogs > 0:
+        # Debit: Cost of Goods Sold
+        lines.append({
+            "account_id": cogs_account['id'] if cogs_account else None,
+            "account_code": "5100",
+            "account_name": "Cost of Goods Sold - Scrap Metal",
+            "description": f"COGS for sale {ref_number}",
+            "debit_amount": cogs,
+            "credit_amount": 0
+        })
+        # Credit: Inventory
+        lines.append({
+            "account_id": inventory_account['id'] if inventory_account else None,
+            "account_code": "1300",
+            "account_name": "Inventory - Scrap Metal",
+            "description": f"Inventory reduction for sale {ref_number}",
+            "debit_amount": 0,
+            "credit_amount": cogs
+        })
+    
+    # Handle broker commission if any
+    if so.get('broker_commission', 0) > 0:
+        broker_exp_account = await db.chart_of_accounts.find_one(
+            {"company_id": company_id, "account_code": "6220"}, {"_id": 0}
+        )
+        ap_account = await db.chart_of_accounts.find_one(
+            {"company_id": company_id, "account_code": "2100"}, {"_id": 0}
+        )
+        commission = float(so.get('broker_commission', 0))
+        lines.append({
+            "account_id": broker_exp_account['id'] if broker_exp_account else None,
+            "account_code": "6220",
+            "account_name": "Commission Expense",
+            "description": f"Broker commission for {ref_number}",
+            "debit_amount": commission,
+            "credit_amount": 0
+        })
+        lines.append({
+            "account_id": ap_account['id'] if ap_account else None,
+            "account_code": "2100",
+            "account_name": "Accounts Payable - Trade",
+            "description": f"Broker commission payable",
+            "debit_amount": 0,
+            "credit_amount": commission
+        })
+    
+    total_debit = sum(l['debit_amount'] for l in lines)
+    total_credit = sum(l['credit_amount'] for l in lines)
+    
+    entry = {
+        "id": str(uuid.uuid4()),
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "entry_date": so.get('order_date', so.get('contract_date', datetime.now(timezone.utc).strftime('%Y-%m-%d'))),
+        "reference_type": f"{so_type}_sale",
+        "reference_id": so['id'],
+        "reference_number": ref_number,
+        "description": f"Sale to {customer_name} - {ref_number}",
+        "lines": lines,
+        "total_debit": total_debit,
+        "total_credit": total_credit,
+        "status": "posted",
+        "created_by": so.get('created_by', ''),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "source": "auto_sale"
+    }
+    
+    await db.accounting_journal_entries.insert_one(entry)
+    
+    # Also create in legacy journal_entries for backward compatibility
+    legacy_entry = JournalEntry(
         entry_number=entry_number,
         entry_date=so.get('order_date', so.get('contract_date', '')),
         reference_type=f"{so_type}_sale",
         reference_id=so['id'],
         reference_number=ref_number,
         description=f"Sale to {customer_name}",
-        lines=lines,
+        lines=[{"account_code": l['account_code'], "account_name": l['account_name'], 
+                "debit": l['debit_amount'], "credit": l['credit_amount']} for l in lines],
         total_debit=total_debit,
         total_credit=total_credit,
         created_by=so.get('created_by')
     )
-    
-    doc = entry.model_dump()
+    doc = legacy_entry.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.journal_entries.insert_one(doc)
 
@@ -4077,6 +4268,302 @@ async def get_cash_flow_report(
         "net_change_in_cash": round(closing_cash - opening_cash, 2),
         "opening_cash": round(opening_cash, 2),
         "closing_cash": round(closing_cash, 2)
+    }
+
+# ==================== RECEIVABLES & PAYABLES REPORTS ====================
+
+@api_router.get("/accounting/reports/receivables")
+async def get_receivables_report(
+    as_of_date: str = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Get Accounts Receivable Report with Aging"""
+    company_id = await get_user_company_id(current_user)
+    
+    if not as_of_date:
+        as_of_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
+    as_of_dt = datetime.strptime(as_of_date, '%Y-%m-%d')
+    
+    # Get all posted sales with outstanding balances
+    # Local Sales
+    local_sales = await db.local_sales.find({
+        "company_id": company_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    # Export Sales
+    export_sales = await db.export_sales.find({
+        "company_id": company_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    # Get all payments received
+    payments_received = await db.payments.find({
+        "company_id": company_id,
+        "payment_type": "receipt"
+    }, {"_id": 0}).to_list(1000)
+    
+    # Build payment map by reference
+    payment_map = {}
+    for p in payments_received:
+        ref_id = p.get('reference_id')
+        if ref_id:
+            payment_map[ref_id] = payment_map.get(ref_id, 0) + p.get('amount', 0)
+    
+    receivables = []
+    total_current = 0
+    total_30_days = 0
+    total_60_days = 0
+    total_90_days = 0
+    total_over_90 = 0
+    
+    # Process local sales
+    for sale in local_sales:
+        invoice_amount = sale.get('total_amount', 0)
+        paid_amount = payment_map.get(sale['id'], 0)
+        balance = invoice_amount - paid_amount
+        
+        if balance > 0.01:  # Has outstanding balance
+            sale_date = datetime.strptime(sale.get('order_date', as_of_date), '%Y-%m-%d')
+            days_outstanding = (as_of_dt - sale_date).days
+            
+            aging_bucket = "current"
+            if days_outstanding <= 0:
+                total_current += balance
+                aging_bucket = "current"
+            elif days_outstanding <= 30:
+                total_30_days += balance
+                aging_bucket = "1-30"
+            elif days_outstanding <= 60:
+                total_60_days += balance
+                aging_bucket = "31-60"
+            elif days_outstanding <= 90:
+                total_90_days += balance
+                aging_bucket = "61-90"
+            else:
+                total_over_90 += balance
+                aging_bucket = "90+"
+            
+            receivables.append({
+                "type": "local_sale",
+                "reference_number": sale.get('order_number', ''),
+                "customer_name": sale.get('customer_name', ''),
+                "invoice_date": sale.get('order_date', ''),
+                "due_date": sale.get('order_date', ''),  # Could add payment terms
+                "invoice_amount": invoice_amount,
+                "paid_amount": paid_amount,
+                "balance": balance,
+                "days_outstanding": days_outstanding,
+                "aging_bucket": aging_bucket,
+                "currency": sale.get('currency', 'AED')
+            })
+    
+    # Process export sales
+    for sale in export_sales:
+        invoice_amount = sale.get('total_amount', 0)
+        paid_amount = payment_map.get(sale['id'], 0)
+        balance = invoice_amount - paid_amount
+        
+        if balance > 0.01:
+            sale_date = datetime.strptime(sale.get('contract_date', as_of_date), '%Y-%m-%d')
+            days_outstanding = (as_of_dt - sale_date).days
+            
+            aging_bucket = "current"
+            if days_outstanding <= 0:
+                total_current += balance
+            elif days_outstanding <= 30:
+                total_30_days += balance
+                aging_bucket = "1-30"
+            elif days_outstanding <= 60:
+                total_60_days += balance
+                aging_bucket = "31-60"
+            elif days_outstanding <= 90:
+                total_90_days += balance
+                aging_bucket = "61-90"
+            else:
+                total_over_90 += balance
+                aging_bucket = "90+"
+            
+            receivables.append({
+                "type": "export_sale",
+                "reference_number": sale.get('contract_number', ''),
+                "customer_name": sale.get('customer_name', ''),
+                "invoice_date": sale.get('contract_date', ''),
+                "due_date": sale.get('contract_date', ''),
+                "invoice_amount": invoice_amount,
+                "paid_amount": paid_amount,
+                "balance": balance,
+                "days_outstanding": days_outstanding,
+                "aging_bucket": aging_bucket,
+                "currency": sale.get('currency', 'AED')
+            })
+    
+    # Sort by days outstanding descending
+    receivables.sort(key=lambda x: x['days_outstanding'], reverse=True)
+    
+    total_receivables = total_current + total_30_days + total_60_days + total_90_days + total_over_90
+    
+    return {
+        "as_of_date": as_of_date,
+        "company_id": company_id,
+        "receivables": receivables,
+        "summary": {
+            "total_receivables": round(total_receivables, 2),
+            "current": round(total_current, 2),
+            "days_1_30": round(total_30_days, 2),
+            "days_31_60": round(total_60_days, 2),
+            "days_61_90": round(total_90_days, 2),
+            "days_over_90": round(total_over_90, 2)
+        },
+        "count": len(receivables)
+    }
+
+
+@api_router.get("/accounting/reports/payables")
+async def get_payables_report(
+    as_of_date: str = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Get Accounts Payable Report with Aging"""
+    company_id = await get_user_company_id(current_user)
+    
+    if not as_of_date:
+        as_of_date = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    
+    as_of_dt = datetime.strptime(as_of_date, '%Y-%m-%d')
+    
+    # Get all posted purchases with outstanding balances
+    # Local Purchases
+    local_purchases = await db.local_purchases.find({
+        "company_id": company_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    # International Purchases
+    intl_purchases = await db.intl_purchases.find({
+        "company_id": company_id,
+        "status": "posted"
+    }, {"_id": 0}).to_list(1000)
+    
+    # Get all payments made
+    payments_made = await db.payments.find({
+        "company_id": company_id,
+        "payment_type": "payment"
+    }, {"_id": 0}).to_list(1000)
+    
+    # Build payment map by reference
+    payment_map = {}
+    for p in payments_made:
+        ref_id = p.get('reference_id')
+        if ref_id:
+            payment_map[ref_id] = payment_map.get(ref_id, 0) + p.get('amount', 0)
+    
+    payables = []
+    total_current = 0
+    total_30_days = 0
+    total_60_days = 0
+    total_90_days = 0
+    total_over_90 = 0
+    
+    # Process local purchases
+    for po in local_purchases:
+        invoice_amount = po.get('total_amount', 0)
+        paid_amount = payment_map.get(po['id'], 0)
+        balance = invoice_amount - paid_amount
+        
+        if balance > 0.01:
+            po_date = datetime.strptime(po.get('order_date', as_of_date), '%Y-%m-%d')
+            days_outstanding = (as_of_dt - po_date).days
+            
+            aging_bucket = "current"
+            if days_outstanding <= 0:
+                total_current += balance
+            elif days_outstanding <= 30:
+                total_30_days += balance
+                aging_bucket = "1-30"
+            elif days_outstanding <= 60:
+                total_60_days += balance
+                aging_bucket = "31-60"
+            elif days_outstanding <= 90:
+                total_90_days += balance
+                aging_bucket = "61-90"
+            else:
+                total_over_90 += balance
+                aging_bucket = "90+"
+            
+            payables.append({
+                "type": "local_purchase",
+                "reference_number": po.get('order_number', ''),
+                "supplier_name": po.get('supplier_name', ''),
+                "invoice_date": po.get('order_date', ''),
+                "due_date": po.get('order_date', ''),
+                "invoice_amount": invoice_amount,
+                "paid_amount": paid_amount,
+                "balance": balance,
+                "days_outstanding": days_outstanding,
+                "aging_bucket": aging_bucket,
+                "currency": po.get('currency', 'AED')
+            })
+    
+    # Process international purchases
+    for po in intl_purchases:
+        invoice_amount = po.get('total_amount', 0)
+        paid_amount = payment_map.get(po['id'], 0)
+        balance = invoice_amount - paid_amount
+        
+        if balance > 0.01:
+            po_date = datetime.strptime(po.get('order_date', as_of_date), '%Y-%m-%d')
+            days_outstanding = (as_of_dt - po_date).days
+            
+            aging_bucket = "current"
+            if days_outstanding <= 0:
+                total_current += balance
+            elif days_outstanding <= 30:
+                total_30_days += balance
+                aging_bucket = "1-30"
+            elif days_outstanding <= 60:
+                total_60_days += balance
+                aging_bucket = "31-60"
+            elif days_outstanding <= 90:
+                total_90_days += balance
+                aging_bucket = "61-90"
+            else:
+                total_over_90 += balance
+                aging_bucket = "90+"
+            
+            payables.append({
+                "type": "intl_purchase",
+                "reference_number": po.get('order_number', ''),
+                "supplier_name": po.get('supplier_name', ''),
+                "invoice_date": po.get('order_date', ''),
+                "due_date": po.get('order_date', ''),
+                "invoice_amount": invoice_amount,
+                "paid_amount": paid_amount,
+                "balance": balance,
+                "days_outstanding": days_outstanding,
+                "aging_bucket": aging_bucket,
+                "currency": po.get('currency', 'AED')
+            })
+    
+    # Sort by days outstanding descending
+    payables.sort(key=lambda x: x['days_outstanding'], reverse=True)
+    
+    total_payables = total_current + total_30_days + total_60_days + total_90_days + total_over_90
+    
+    return {
+        "as_of_date": as_of_date,
+        "company_id": company_id,
+        "payables": payables,
+        "summary": {
+            "total_payables": round(total_payables, 2),
+            "current": round(total_current, 2),
+            "days_1_30": round(total_30_days, 2),
+            "days_31_60": round(total_60_days, 2),
+            "days_61_90": round(total_90_days, 2),
+            "days_over_90": round(total_over_90, 2)
+        },
+        "count": len(payables)
     }
 
 # ==================== SEED DATA ====================

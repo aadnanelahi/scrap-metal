@@ -111,6 +111,23 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### ✅ Custom Branding
 - TechSight Innovation branding on login page and sidebar
 
+## Recent Changes (March 9, 2026)
+
+### New Features ✅ - Accounting Module Phase 2
+- **Automatic Journal Entry on PO/SO Posting**: When Purchase Orders or Sales Orders are posted, automatic journal entries are created in the `accounting_journal_entries` collection
+  - Purchase posting creates: Debit Inventory, Debit VAT Input, Credit Accounts Payable
+  - Sales posting creates: Debit Accounts Receivable, Credit Sales Revenue, Credit VAT Output, Debit COGS, Credit Inventory
+- **Accounts Receivable Report**: New page showing outstanding customer invoices with aging analysis (Current, 1-30, 31-60, 61-90, 90+ days)
+- **Accounts Payable Report**: New page showing outstanding supplier bills with aging analysis
+- **Both reports support**:
+  - As-of-date filtering
+  - Print functionality
+  - Aging buckets with color coding
+
+### API Endpoints Added
+- `GET /api/accounting/reports/receivables` - Receivables aging report
+- `GET /api/accounting/reports/payables` - Payables aging report
+
 ## Recent Changes (February 25, 2026)
 
 ### Bug Fix ✅

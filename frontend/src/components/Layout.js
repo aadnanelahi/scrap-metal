@@ -103,6 +103,8 @@ const navItems = [
       { title: 'Expenses', path: '/accounting/expenses' },
       { title: 'Income', path: '/accounting/income' },
       { title: 'Journal Entries', path: '/accounting/journal-entries' },
+      { title: 'Receivables', path: '/accounting/reports/receivables' },
+      { title: 'Payables', path: '/accounting/reports/payables' },
       { title: 'Profit & Loss', path: '/accounting/reports/profit-loss' },
       { title: 'Balance Sheet', path: '/accounting/reports/balance-sheet' },
     ],
