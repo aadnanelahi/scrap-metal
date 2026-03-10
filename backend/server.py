@@ -1775,10 +1775,16 @@ async def get_inventory_movements(
 
 # ==================== ACCOUNTING FUNCTIONS ====================
 async def create_purchase_journal_entry(po: Dict, po_type: str):
-    """Create accounting journal entry when PO is posted"""
+    """Create accounting journal entry when PO is posted
+    All amounts are converted to base currency (AED) for consistent reporting
+    """
     company_id = po.get('company_id')
     if not company_id:
         return  # Skip if no company_id
+    
+    # Get exchange rate for currency conversion to AED
+    exchange_rate = float(po.get('exchange_rate', 1) or 1)
+    currency = po.get('currency', 'AED')
     
     # Get account IDs from Chart of Accounts
     inventory_account = await db.chart_of_accounts.find_one(
@@ -1800,41 +1806,46 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
     
     lines = []
     
-    # Debit: Inventory
-    if po.get('subtotal', 0) > 0:
+    # Convert amounts to AED - multiply by exchange rate for foreign currency
+    subtotal_aed = float(po.get('subtotal', 0)) * exchange_rate if currency != 'AED' else float(po.get('subtotal', 0))
+    vat_amount_aed = float(po.get('vat_amount', 0)) * exchange_rate if currency != 'AED' else float(po.get('vat_amount', 0))
+    total_amount_aed = float(po.get('total_amount', 0)) * exchange_rate if currency != 'AED' else float(po.get('total_amount', 0))
+    broker_commission_aed = float(po.get('broker_commission', 0)) * exchange_rate if currency != 'AED' else float(po.get('broker_commission', 0))
+    
+    # Debit: Inventory (in AED)
+    if subtotal_aed > 0:
         lines.append({
             "account_id": inventory_id,
             "account_code": "1300",
             "account_name": "Inventory - Scrap Metal",
             "description": f"Purchase from {po.get('supplier_name', '')}",
-            "debit_amount": float(po.get('subtotal', 0)),
+            "debit_amount": round(subtotal_aed, 2),
             "credit_amount": 0
         })
     
-    # Debit: VAT Input (if any)
-    if po.get('vat_amount', 0) > 0:
+    # Debit: VAT Input (if any, in AED)
+    if vat_amount_aed > 0:
         lines.append({
             "account_id": vat_input_id,
             "account_code": "1350",
             "account_name": "VAT Receivable (Input)",
             "description": f"VAT on purchase {po.get('order_number', '')}",
-            "debit_amount": float(po.get('vat_amount', 0)),
+            "debit_amount": round(vat_amount_aed, 2),
             "credit_amount": 0
         })
     
-    # Credit: Accounts Payable
-    total_credit = float(po.get('total_amount', 0))
+    # Credit: Accounts Payable (in AED)
     lines.append({
         "account_id": ap_id,
         "account_code": "2100",
         "account_name": "Accounts Payable - Trade",
         "description": f"Payable to {po.get('supplier_name', '')}",
         "debit_amount": 0,
-        "credit_amount": total_credit
+        "credit_amount": round(total_amount_aed, 2)
     })
     
-    # Handle broker commission if any
-    if po.get('broker_commission', 0) > 0:
+    # Handle broker commission if any (in AED)
+    if broker_commission_aed > 0:
         broker_exp_account = await db.chart_of_accounts.find_one(
             {"company_id": company_id, "account_code": "6220"}, {"_id": 0}
         )
@@ -1843,7 +1854,7 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
             "account_code": "6220",
             "account_name": "Commission Expense",
             "description": f"Broker commission for {po.get('order_number', '')}",
-            "debit_amount": float(po.get('broker_commission', 0)),
+            "debit_amount": round(broker_commission_aed, 2),
             "credit_amount": 0
         })
         lines.append({
@@ -1852,7 +1863,7 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
             "account_name": "Accounts Payable - Trade",
             "description": f"Broker commission payable",
             "debit_amount": 0,
-            "credit_amount": float(po.get('broker_commission', 0))
+            "credit_amount": round(broker_commission_aed, 2)
         })
     
     total_debit = sum(l['debit_amount'] for l in lines)
@@ -1868,12 +1879,15 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
         "reference_number": po.get('order_number', ''),
         "description": f"Purchase from {po.get('supplier_name', '')} - {po.get('order_number', '')}",
         "lines": lines,
-        "total_debit": total_debit,
-        "total_credit": total_credit,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
         "status": "posted",
         "created_by": po.get('created_by', ''),
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": "auto_purchase"
+        "source": "auto_purchase",
+        "original_currency": currency,
+        "exchange_rate": exchange_rate,
+        "base_currency": "AED"
     }
     
     await db.accounting_journal_entries.insert_one(entry)
@@ -1888,8 +1902,8 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
         description=f"Purchase from {po.get('supplier_name', '')}",
         lines=[{"account_code": l['account_code'], "account_name": l['account_name'], 
                 "debit": l['debit_amount'], "credit": l['credit_amount']} for l in lines],
-        total_debit=total_debit,
-        total_credit=total_credit,
+        total_debit=round(total_debit, 2),
+        total_credit=round(total_credit, 2),
         created_by=po.get('created_by')
     )
     doc = legacy_entry.model_dump()
@@ -1897,10 +1911,16 @@ async def create_purchase_journal_entry(po: Dict, po_type: str):
     await db.journal_entries.insert_one(doc)
 
 async def create_sales_journal_entry(so: Dict, so_type: str):
-    """Create accounting journal entry when SO is posted"""
+    """Create accounting journal entry when SO is posted
+    All amounts are converted to base currency (AED) for consistent reporting
+    """
     company_id = so.get('company_id')
     if not company_id:
         return  # Skip if no company_id
+    
+    # Get exchange rate for currency conversion to AED
+    exchange_rate = float(so.get('exchange_rate', 1) or 1)
+    currency = so.get('currency', 'AED')
     
     # Get account IDs from Chart of Accounts
     ar_account = await db.chart_of_accounts.find_one(
@@ -1921,7 +1941,7 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
     
     entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
     
-    # Calculate COGS
+    # Calculate COGS (already in AED from inventory)
     cogs = 0
     for line in so.get('lines', []):
         stock = await db.inventory_stock.find_one({
@@ -1934,43 +1954,46 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
     customer_name = so.get('customer_name', '')
     ref_number = so.get('order_number', so.get('contract_number', ''))
     
+    # Convert amounts to AED
+    total_amount_aed = float(so.get('total_amount', 0)) * exchange_rate if currency != 'AED' else float(so.get('total_amount', 0))
+    subtotal_aed = float(so.get('subtotal', 0)) * exchange_rate if currency != 'AED' else float(so.get('subtotal', 0))
+    vat_amount_aed = float(so.get('vat_amount', 0)) * exchange_rate if currency != 'AED' else float(so.get('vat_amount', 0))
+    broker_commission_aed = float(so.get('broker_commission', 0)) * exchange_rate if currency != 'AED' else float(so.get('broker_commission', 0))
+    
     lines = []
     
-    # Debit: Accounts Receivable
-    total_amount = float(so.get('total_amount', 0))
+    # Debit: Accounts Receivable (in AED)
     lines.append({
         "account_id": ar_account['id'] if ar_account else None,
         "account_code": "1200",
         "account_name": "Accounts Receivable - Trade",
         "description": f"Receivable from {customer_name}",
-        "debit_amount": total_amount,
+        "debit_amount": round(total_amount_aed, 2),
         "credit_amount": 0
     })
     
-    # Credit: Sales Revenue
-    subtotal = float(so.get('subtotal', 0))
+    # Credit: Sales Revenue (in AED)
     lines.append({
         "account_id": sales_account['id'] if sales_account else None,
         "account_code": "4100",
         "account_name": "Sales Revenue - Scrap Metal",
         "description": f"Sale to {customer_name}",
         "debit_amount": 0,
-        "credit_amount": subtotal
+        "credit_amount": round(subtotal_aed, 2)
     })
     
-    # Credit: VAT Output (if any - skip for exports)
-    vat_amount = float(so.get('vat_amount', 0))
-    if vat_amount > 0 and so_type == 'local':
+    # Credit: VAT Output (if any - skip for exports, in AED)
+    if vat_amount_aed > 0 and so_type == 'local':
         lines.append({
             "account_id": vat_output_account['id'] if vat_output_account else None,
             "account_code": "2200",
             "account_name": "VAT Payable (Output)",
             "description": f"VAT on sale {ref_number}",
             "debit_amount": 0,
-            "credit_amount": vat_amount
+            "credit_amount": round(vat_amount_aed, 2)
         })
     
-    # COGS entries
+    # COGS entries (already in AED from inventory average cost)
     if cogs > 0:
         # Debit: Cost of Goods Sold
         lines.append({
@@ -1978,7 +2001,7 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
             "account_code": "5100",
             "account_name": "Cost of Goods Sold - Scrap Metal",
             "description": f"COGS for sale {ref_number}",
-            "debit_amount": cogs,
+            "debit_amount": round(cogs, 2),
             "credit_amount": 0
         })
         # Credit: Inventory
@@ -1988,24 +2011,23 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
             "account_name": "Inventory - Scrap Metal",
             "description": f"Inventory reduction for sale {ref_number}",
             "debit_amount": 0,
-            "credit_amount": cogs
+            "credit_amount": round(cogs, 2)
         })
     
-    # Handle broker commission if any
-    if so.get('broker_commission', 0) > 0:
+    # Handle broker commission if any (in AED)
+    if broker_commission_aed > 0:
         broker_exp_account = await db.chart_of_accounts.find_one(
             {"company_id": company_id, "account_code": "6220"}, {"_id": 0}
         )
         ap_account = await db.chart_of_accounts.find_one(
             {"company_id": company_id, "account_code": "2100"}, {"_id": 0}
         )
-        commission = float(so.get('broker_commission', 0))
         lines.append({
             "account_id": broker_exp_account['id'] if broker_exp_account else None,
             "account_code": "6220",
             "account_name": "Commission Expense",
             "description": f"Broker commission for {ref_number}",
-            "debit_amount": commission,
+            "debit_amount": round(broker_commission_aed, 2),
             "credit_amount": 0
         })
         lines.append({
@@ -2014,7 +2036,7 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
             "account_name": "Accounts Payable - Trade",
             "description": f"Broker commission payable",
             "debit_amount": 0,
-            "credit_amount": commission
+            "credit_amount": round(broker_commission_aed, 2)
         })
     
     total_debit = sum(l['debit_amount'] for l in lines)
@@ -2030,12 +2052,15 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
         "reference_number": ref_number,
         "description": f"Sale to {customer_name} - {ref_number}",
         "lines": lines,
-        "total_debit": total_debit,
-        "total_credit": total_credit,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
         "status": "posted",
         "created_by": so.get('created_by', ''),
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "source": "auto_sale"
+        "source": "auto_sale",
+        "original_currency": currency,
+        "exchange_rate": exchange_rate,
+        "base_currency": "AED"
     }
     
     await db.accounting_journal_entries.insert_one(entry)
@@ -2050,8 +2075,8 @@ async def create_sales_journal_entry(so: Dict, so_type: str):
         description=f"Sale to {customer_name}",
         lines=[{"account_code": l['account_code'], "account_name": l['account_name'], 
                 "debit": l['debit_amount'], "credit": l['credit_amount']} for l in lines],
-        total_debit=total_debit,
-        total_credit=total_credit,
+        total_debit=round(total_debit, 2),
+        total_credit=round(total_credit, 2),
         created_by=so.get('created_by')
     )
     doc = legacy_entry.model_dump()
@@ -4321,28 +4346,36 @@ async def get_receivables_report(
     # Process local sales
     for sale in local_sales:
         invoice_amount = sale.get('total_amount', 0)
-        paid_amount = payment_map.get(sale['id'], 0)
-        balance = invoice_amount - paid_amount
+        exchange_rate = sale.get('exchange_rate', 1) or 1
+        currency = sale.get('currency', 'AED')
         
-        if balance > 0.01:  # Has outstanding balance
+        # Convert to base currency (AED) if foreign currency
+        invoice_amount_aed = invoice_amount * exchange_rate if currency != 'AED' else invoice_amount
+        
+        paid_amount = payment_map.get(sale['id'], 0)
+        paid_amount_aed = paid_amount * exchange_rate if currency != 'AED' else paid_amount
+        
+        balance_aed = invoice_amount_aed - paid_amount_aed
+        
+        if balance_aed > 0.01:  # Has outstanding balance
             sale_date = datetime.strptime(sale.get('order_date', as_of_date), '%Y-%m-%d')
             days_outstanding = (as_of_dt - sale_date).days
             
             aging_bucket = "current"
             if days_outstanding <= 0:
-                total_current += balance
+                total_current += balance_aed
                 aging_bucket = "current"
             elif days_outstanding <= 30:
-                total_30_days += balance
+                total_30_days += balance_aed
                 aging_bucket = "1-30"
             elif days_outstanding <= 60:
-                total_60_days += balance
+                total_60_days += balance_aed
                 aging_bucket = "31-60"
             elif days_outstanding <= 90:
-                total_90_days += balance
+                total_90_days += balance_aed
                 aging_bucket = "61-90"
             else:
-                total_over_90 += balance
+                total_over_90 += balance_aed
                 aging_bucket = "90+"
             
             receivables.append({
@@ -4351,38 +4384,51 @@ async def get_receivables_report(
                 "customer_name": sale.get('customer_name', ''),
                 "invoice_date": sale.get('order_date', ''),
                 "due_date": sale.get('order_date', ''),  # Could add payment terms
-                "invoice_amount": invoice_amount,
-                "paid_amount": paid_amount,
-                "balance": balance,
+                "invoice_amount": round(invoice_amount, 2),
+                "invoice_amount_aed": round(invoice_amount_aed, 2),
+                "paid_amount": round(paid_amount, 2),
+                "paid_amount_aed": round(paid_amount_aed, 2),
+                "balance": round(invoice_amount - paid_amount, 2),
+                "balance_aed": round(balance_aed, 2),
                 "days_outstanding": days_outstanding,
                 "aging_bucket": aging_bucket,
-                "currency": sale.get('currency', 'AED')
+                "currency": currency,
+                "exchange_rate": exchange_rate
             })
     
     # Process export sales
     for sale in export_sales:
         invoice_amount = sale.get('total_amount', 0)
-        paid_amount = payment_map.get(sale['id'], 0)
-        balance = invoice_amount - paid_amount
+        exchange_rate = sale.get('exchange_rate', 1) or 1
+        currency = sale.get('currency', 'AED')
         
-        if balance > 0.01:
+        # Convert to base currency (AED) if foreign currency
+        invoice_amount_aed = invoice_amount * exchange_rate if currency != 'AED' else invoice_amount
+        
+        paid_amount = payment_map.get(sale['id'], 0)
+        # Payments are typically in base currency, but if in foreign currency, convert
+        paid_amount_aed = paid_amount * exchange_rate if currency != 'AED' else paid_amount
+        
+        balance_aed = invoice_amount_aed - paid_amount_aed
+        
+        if balance_aed > 0.01:
             sale_date = datetime.strptime(sale.get('contract_date', as_of_date), '%Y-%m-%d')
             days_outstanding = (as_of_dt - sale_date).days
             
             aging_bucket = "current"
             if days_outstanding <= 0:
-                total_current += balance
+                total_current += balance_aed
             elif days_outstanding <= 30:
-                total_30_days += balance
+                total_30_days += balance_aed
                 aging_bucket = "1-30"
             elif days_outstanding <= 60:
-                total_60_days += balance
+                total_60_days += balance_aed
                 aging_bucket = "31-60"
             elif days_outstanding <= 90:
-                total_90_days += balance
+                total_90_days += balance_aed
                 aging_bucket = "61-90"
             else:
-                total_over_90 += balance
+                total_over_90 += balance_aed
                 aging_bucket = "90+"
             
             receivables.append({
@@ -4391,12 +4437,16 @@ async def get_receivables_report(
                 "customer_name": sale.get('customer_name', ''),
                 "invoice_date": sale.get('contract_date', ''),
                 "due_date": sale.get('contract_date', ''),
-                "invoice_amount": invoice_amount,
-                "paid_amount": paid_amount,
-                "balance": balance,
+                "invoice_amount": round(invoice_amount, 2),
+                "invoice_amount_aed": round(invoice_amount_aed, 2),
+                "paid_amount": round(paid_amount, 2),
+                "paid_amount_aed": round(paid_amount_aed, 2),
+                "balance": round(invoice_amount - paid_amount, 2),
+                "balance_aed": round(balance_aed, 2),
                 "days_outstanding": days_outstanding,
                 "aging_bucket": aging_bucket,
-                "currency": sale.get('currency', 'AED')
+                "currency": currency,
+                "exchange_rate": exchange_rate
             })
     
     # Sort by days outstanding descending
@@ -4466,7 +4516,7 @@ async def get_payables_report(
     total_90_days = 0
     total_over_90 = 0
     
-    # Process local purchases
+    # Process local purchases (already in AED)
     for po in local_purchases:
         invoice_amount = po.get('total_amount', 0)
         paid_amount = payment_map.get(po['id'], 0)
@@ -4498,38 +4548,52 @@ async def get_payables_report(
                 "supplier_name": po.get('supplier_name', ''),
                 "invoice_date": po.get('order_date', ''),
                 "due_date": po.get('order_date', ''),
-                "invoice_amount": invoice_amount,
-                "paid_amount": paid_amount,
-                "balance": balance,
+                "invoice_amount": round(invoice_amount, 2),
+                "invoice_amount_aed": round(invoice_amount, 2),
+                "paid_amount": round(paid_amount, 2),
+                "paid_amount_aed": round(paid_amount, 2),
+                "balance": round(balance, 2),
+                "balance_aed": round(balance, 2),
                 "days_outstanding": days_outstanding,
                 "aging_bucket": aging_bucket,
-                "currency": po.get('currency', 'AED')
+                "currency": po.get('currency', 'AED'),
+                "exchange_rate": 1
             })
     
-    # Process international purchases
+    # Process international purchases - CONVERT TO AED
     for po in intl_purchases:
         invoice_amount = po.get('total_amount', 0)
-        paid_amount = payment_map.get(po['id'], 0)
-        balance = invoice_amount - paid_amount
+        exchange_rate = float(po.get('exchange_rate', 1) or 1)
+        currency = po.get('currency', 'USD')
         
-        if balance > 0.01:
+        # Convert to base currency (AED) if foreign currency
+        invoice_amount_aed = invoice_amount * exchange_rate if currency != 'AED' else invoice_amount
+        
+        paid_amount = payment_map.get(po['id'], 0)
+        # Payments may be in original currency or AED - convert if needed
+        paid_amount_aed = paid_amount * exchange_rate if currency != 'AED' else paid_amount
+        
+        balance = invoice_amount - paid_amount
+        balance_aed = invoice_amount_aed - paid_amount_aed
+        
+        if balance_aed > 0.01:
             po_date = datetime.strptime(po.get('order_date', as_of_date), '%Y-%m-%d')
             days_outstanding = (as_of_dt - po_date).days
             
             aging_bucket = "current"
             if days_outstanding <= 0:
-                total_current += balance
+                total_current += balance_aed
             elif days_outstanding <= 30:
-                total_30_days += balance
+                total_30_days += balance_aed
                 aging_bucket = "1-30"
             elif days_outstanding <= 60:
-                total_60_days += balance
+                total_60_days += balance_aed
                 aging_bucket = "31-60"
             elif days_outstanding <= 90:
-                total_90_days += balance
+                total_90_days += balance_aed
                 aging_bucket = "61-90"
             else:
-                total_over_90 += balance
+                total_over_90 += balance_aed
                 aging_bucket = "90+"
             
             payables.append({
@@ -4538,12 +4602,16 @@ async def get_payables_report(
                 "supplier_name": po.get('supplier_name', ''),
                 "invoice_date": po.get('order_date', ''),
                 "due_date": po.get('order_date', ''),
-                "invoice_amount": invoice_amount,
-                "paid_amount": paid_amount,
-                "balance": balance,
+                "invoice_amount": round(invoice_amount, 2),
+                "invoice_amount_aed": round(invoice_amount_aed, 2),
+                "paid_amount": round(paid_amount, 2),
+                "paid_amount_aed": round(paid_amount_aed, 2),
+                "balance": round(balance, 2),
+                "balance_aed": round(balance_aed, 2),
                 "days_outstanding": days_outstanding,
                 "aging_bucket": aging_bucket,
-                "currency": po.get('currency', 'AED')
+                "currency": currency,
+                "exchange_rate": exchange_rate
             })
     
     # Sort by days outstanding descending

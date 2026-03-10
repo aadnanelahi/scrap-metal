@@ -95,9 +95,12 @@ export default function PayablesPage() {
               <td style="padding:8px;border:1px solid #e2e8f0;">${p.reference_number}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${p.supplier_name}</td>
               <td style="padding:8px;border:1px solid #e2e8f0;">${p.invoice_date}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(p.invoice_amount)}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(p.paid_amount)}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(p.balance)}</td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">
+                ${formatCurrency(p.invoice_amount_aed || p.invoice_amount)}
+                ${p.currency && p.currency !== 'AED' ? `<br/><small style="color:#666;">(${p.currency} ${p.invoice_amount?.toLocaleString()})</small>` : ''}
+              </td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(p.paid_amount_aed || p.paid_amount)}</td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;font-weight:bold;">${formatCurrency(p.balance_aed || p.balance)}</td>
               <td style="padding:8px;text-align:center;border:1px solid #e2e8f0;">${p.days_outstanding} days</td>
             </tr>
           `).join('')}
@@ -222,9 +225,20 @@ export default function PayablesPage() {
                         </td>
                         <td className="p-3">{item.supplier_name}</td>
                         <td className="p-3 text-sm text-slate-600">{item.invoice_date}</td>
-                        <td className="p-3 text-right font-mono">{formatCurrency(item.invoice_amount)}</td>
-                        <td className="p-3 text-right font-mono text-green-600">{formatCurrency(item.paid_amount)}</td>
-                        <td className="p-3 text-right font-mono font-bold">{formatCurrency(item.balance)}</td>
+                        <td className="p-3 text-right font-mono">
+                          {formatCurrency(item.invoice_amount_aed || item.invoice_amount)}
+                          {item.currency && item.currency !== 'AED' && (
+                            <span className="block text-xs text-slate-400">
+                              ({item.currency} {item.invoice_amount?.toLocaleString()})
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right font-mono text-green-600">
+                          {formatCurrency(item.paid_amount_aed || item.paid_amount)}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold">
+                          {formatCurrency(item.balance_aed || item.balance)}
+                        </td>
                         <td className="p-3 text-center">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getAgingColor(item.aging_bucket)}`}>
                             {item.days_outstanding} days

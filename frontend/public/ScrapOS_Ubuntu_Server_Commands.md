@@ -94,7 +94,7 @@ curl http://localhost:8001/api/health
 
 ### Test backend API from external URL
 ```
-curl https://journal-ledger.preview.emergentagent.com/api/health
+curl https://erp-accounting-fix-3.preview.emergentagent.com/api/health
 ```
 
 ### Check if backend port is listening
@@ -312,8 +312,8 @@ chmod +x /app/scrapos-manage.sh
 
 | Service | URL |
 |---------|-----|
-| Frontend (External) | https://journal-ledger.preview.emergentagent.com |
-| API (External) | https://journal-ledger.preview.emergentagent.com/api |
+| Frontend (External) | https://erp-accounting-fix-3.preview.emergentagent.com |
+| API (External) | https://erp-accounting-fix-3.preview.emergentagent.com/api |
 | Backend (Local) | http://localhost:8001 |
 | Frontend (Local) | http://localhost:3000 |
 | MongoDB (Local) | mongodb://localhost:27017 |
