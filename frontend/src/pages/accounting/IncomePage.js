@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { incomeAPI, chartOfAccountsAPI } from '../../lib/api';
-import { formatCurrency, formatDate, toISODateString } from '../../lib/utils';
+import { formatCurrency, formatDate, toISODateString, printDocument } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, TrendingUp, Wallet, Calendar } from 'lucide-react';
+import { Plus, Loader2, TrendingUp, Wallet, Calendar, Printer } from 'lucide-react';
 
 export default function IncomePage() {
   const [incomeEntries, setIncomeEntries] = useState([]);
@@ -115,6 +115,78 @@ export default function IncomePage() {
     }
   };
 
+  const handlePrintVoucher = (income) => {
+    const html = `
+      <div style="text-align:center;margin-bottom:30px;">
+        <h1 style="margin:0;font-size:24px;">INCOME RECEIPT VOUCHER</h1>
+        <p style="margin:5px 0;color:#666;">ScrapOS ERP System</p>
+      </div>
+      
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;width:30%;background:#f8fafc;font-weight:600;">Voucher No.</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${income.entry_number}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;width:20%;background:#f8fafc;font-weight:600;">Date</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${formatDate(income.income_date)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Income Account</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${income.income_account_code} - ${income.income_account_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Payment Method</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${income.payment_method?.toUpperCase()}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Receiving Account</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${income.payment_account_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Reference No.</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${income.reference_number || '-'}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Description</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${income.description || '-'}</td>
+        </tr>
+      </table>
+      
+      <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
+        <tr style="background:#059669;color:white;">
+          <th style="padding:12px;text-align:left;">Account</th>
+          <th style="padding:12px;text-align:right;">Debit (AED)</th>
+          <th style="padding:12px;text-align:right;">Credit (AED)</th>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #e2e8f0;">${income.payment_account_name}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;">${formatCurrency(income.amount)}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #e2e8f0;">${income.income_account_code} - ${income.income_account_name}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">-</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;">${formatCurrency(income.amount)}</td>
+        </tr>
+        <tr style="background:#f8fafc;font-weight:bold;">
+          <td style="padding:10px;border:1px solid #e2e8f0;">TOTAL</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">${formatCurrency(income.amount)}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">${formatCurrency(income.amount)}</td>
+        </tr>
+      </table>
+      
+      <div style="display:flex;justify-content:space-between;margin-top:60px;">
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Prepared By</div>
+        </div>
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Approved By</div>
+        </div>
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Paid By</div>
+        </div>
+      </div>
+    `;
+    printDocument(html, `Income-Receipt-${income.entry_number}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -197,12 +269,13 @@ export default function IncomePage() {
               <th className="text-right">Amount</th>
               <th>Description</th>
               <th>Status</th>
+              <th className="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {incomeEntries.length === 0 ? (
               <tr>
-                <td colSpan="7" className="text-center py-8 text-slate-500">
+                <td colSpan="8" className="text-center py-8 text-slate-500">
                   No income recorded yet
                 </td>
               </tr>
@@ -226,6 +299,16 @@ export default function IncomePage() {
                   <td className="max-w-xs truncate">{inc.description}</td>
                   <td>
                     <Badge className="bg-emerald-100 text-emerald-800">Posted</Badge>
+                  </td>
+                  <td className="text-center">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handlePrintVoucher(inc)}
+                      title="Print Voucher"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </Button>
                   </td>
                 </tr>
               ))

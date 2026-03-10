@@ -107,6 +107,7 @@ const navItems = [
       { title: 'Payables', path: '/accounting/reports/payables' },
       { title: 'Profit & Loss', path: '/accounting/reports/profit-loss' },
       { title: 'Balance Sheet', path: '/accounting/reports/balance-sheet' },
+      { title: 'Settings', path: '/accounting/settings' },
     ],
   },
   {

@@ -54,6 +54,7 @@ import ProfitAndLossPage from './pages/accounting/ProfitLossPage';
 import BalanceSheetPage from './pages/accounting/BalanceSheetPage';
 import ReceivablesPage from './pages/accounting/ReceivablesPage';
 import PayablesPage from './pages/accounting/PayablesPage';
+import AccountingSettingsPage from './pages/accounting/AccountingSettingsPage';
 
 // Reports
 import PurchaseRegisterPage from './pages/reports/PurchaseRegisterPage';
@@ -160,6 +161,7 @@ function AppRoutes() {
       <Route path="/accounting/reports/balance-sheet" element={<ProtectedRoute><BalanceSheetPage /></ProtectedRoute>} />
       <Route path="/accounting/reports/receivables" element={<ProtectedRoute><ReceivablesPage /></ProtectedRoute>} />
       <Route path="/accounting/reports/payables" element={<ProtectedRoute><PayablesPage /></ProtectedRoute>} />
+      <Route path="/accounting/settings" element={<ProtectedRoute><AccountingSettingsPage /></ProtectedRoute>} />
 
       {/* Reports */}
       <Route path="/reports/purchases" element={<ProtectedRoute><PurchaseRegisterPage /></ProtectedRoute>} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { expensesAPI, chartOfAccountsAPI } from '../../lib/api';
-import { formatCurrency, formatDate, toISODateString } from '../../lib/utils';
+import { formatCurrency, formatDate, toISODateString, printDocument } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, Receipt, Wallet, Building } from 'lucide-react';
+import { Plus, Loader2, Receipt, Wallet, Building, Printer } from 'lucide-react';
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([]);
@@ -115,6 +115,78 @@ export default function ExpensesPage() {
     }
   };
 
+  const handlePrintVoucher = (expense) => {
+    const html = `
+      <div style="text-align:center;margin-bottom:30px;">
+        <h1 style="margin:0;font-size:24px;">EXPENSE VOUCHER</h1>
+        <p style="margin:5px 0;color:#666;">ScrapOS ERP System</p>
+      </div>
+      
+      <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;width:30%;background:#f8fafc;font-weight:600;">Voucher No.</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${expense.entry_number}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;width:20%;background:#f8fafc;font-weight:600;">Date</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${formatDate(expense.expense_date)}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Expense Account</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${expense.expense_account_code} - ${expense.expense_account_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Payment Method</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${expense.payment_method?.toUpperCase()}</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Payment Account</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;">${expense.payment_account_name}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Reference No.</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${expense.reference_number || '-'}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;border:1px solid #e2e8f0;background:#f8fafc;font-weight:600;">Description</td>
+          <td style="padding:8px;border:1px solid #e2e8f0;" colspan="3">${expense.description || '-'}</td>
+        </tr>
+      </table>
+      
+      <table style="width:100%;border-collapse:collapse;margin-bottom:30px;">
+        <tr style="background:#1e293b;color:white;">
+          <th style="padding:12px;text-align:left;">Account</th>
+          <th style="padding:12px;text-align:right;">Debit (AED)</th>
+          <th style="padding:12px;text-align:right;">Credit (AED)</th>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #e2e8f0;">${expense.expense_account_code} - ${expense.expense_account_name}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;">${formatCurrency(expense.amount)}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">-</td>
+        </tr>
+        <tr>
+          <td style="padding:10px;border:1px solid #e2e8f0;">${expense.payment_account_name}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">-</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;font-weight:bold;">${formatCurrency(expense.amount)}</td>
+        </tr>
+        <tr style="background:#f8fafc;font-weight:bold;">
+          <td style="padding:10px;border:1px solid #e2e8f0;">TOTAL</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">${formatCurrency(expense.amount)}</td>
+          <td style="padding:10px;border:1px solid #e2e8f0;text-align:right;">${formatCurrency(expense.amount)}</td>
+        </tr>
+      </table>
+      
+      <div style="display:flex;justify-content:space-between;margin-top:60px;">
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Prepared By</div>
+        </div>
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Approved By</div>
+        </div>
+        <div style="text-align:center;width:30%;">
+          <div style="border-top:1px solid #333;padding-top:10px;">Received By</div>
+        </div>
+      </div>
+    `;
+    printDocument(html, `Expense-Voucher-${expense.entry_number}`);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -197,12 +269,13 @@ export default function ExpensesPage() {
               <th className="text-right">Amount</th>
               <th>Description</th>
               <th>Status</th>
+              <th className="text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {expenses.length === 0 ? (
               <tr>
-                <td colSpan="7" className="text-center py-8 text-slate-500">
+                <td colSpan="8" className="text-center py-8 text-slate-500">
                   No expenses recorded yet
                 </td>
               </tr>
@@ -226,6 +299,16 @@ export default function ExpensesPage() {
                   <td className="max-w-xs truncate">{exp.description}</td>
                   <td>
                     <Badge className="bg-emerald-100 text-emerald-800">Posted</Badge>
+                  </td>
+                  <td className="text-center">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => handlePrintVoucher(exp)}
+                      title="Print Voucher"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </Button>
                   </td>
                 </tr>
               ))
