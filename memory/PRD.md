@@ -127,6 +127,22 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - `ReceivablesPage.js` - displays AED amounts with original currency reference
   - `PayablesPage.js` - displays AED amounts with original currency reference
 
+### New Feature ✅ - Accounting Settings Page (Phase 3)
+- **Accounting Settings page at `/accounting/settings`**
+  - **Fiscal Year Configuration**: Start date dropdown (Jan/Apr/Jul/Oct), auto-calculated end date, current fiscal year selector
+  - **Period Lock**: Toggle to enable period locking, date picker for lock date, warning message
+  - **Default Accounts**: Dropdowns to set default Cash, Bank, Receivable, Payable, Sales, COGS, and Inventory accounts
+  - **Base Currency**: Selector for base reporting currency (AED, USD, EUR, GBP, SAR)
+  - Save button to persist all settings
+
+### New Feature ✅ - Print Vouchers for Expenses and Income
+- **Expense Voucher Printing**: Print icon in Actions column for each expense entry
+  - Professional voucher format with header, account details, debit/credit breakdown
+  - Signature lines for Prepared By, Approved By, Received By
+- **Income Receipt Voucher Printing**: Print icon in Actions column for each income entry
+  - Professional receipt format with income account, payment method, amounts
+  - Signature lines for Prepared By, Approved By, Paid By
+
 ## Recent Changes (March 9, 2026)
 
 ### New Features ✅ - Accounting Module Phase 2
@@ -211,9 +227,10 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] **Accounting Module Phase 1** - Chart of Accounts, Expenses, Income, Journal Entries, P&L, Balance Sheet
 - [x] **Accounting Module Phase 2** - Integrate Purchase/Sales with accounting (auto journal entries on posting)
 - [x] **Currency Conversion Bug Fix** - All financial reports now correctly convert foreign currency to AED
+- [x] **Accounting Module Phase 3** - Accounting Settings page (fiscal year, default accounts, period lock)
+- [x] **Print Vouchers** - Print functionality for Expense and Income vouchers
 
 ### P0 - In Progress
-- [ ] **Accounting Module Phase 3** - Accounting Settings page, fiscal year management
 - [ ] **Accounting Module Phase 4** - Role-based permissions for finance operations
 - [ ] **Accounting Module Phase 5** - Data migration script for existing companies
 
