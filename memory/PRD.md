@@ -111,6 +111,22 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### ✅ Custom Branding
 - TechSight Innovation branding on login page and sidebar
 
+## Recent Changes (March 10, 2026)
+
+### Bug Fix ✅ - Currency Conversion in Financial Reports
+- **Fixed currency conversion bug in all financial reports**
+  - Foreign currency transactions (e.g., USD) now correctly convert to base currency (AED)
+  - All journal entries created from PO/SO posting now store amounts in AED
+  - Receivables and Payables reports show `invoice_amount_aed`, `balance_aed`, `paid_amount_aed` fields
+  - Frontend displays AED amounts with original currency shown in smaller text for reference
+- **Affected areas fixed**:
+  - `create_purchase_journal_entry()` - converts international purchase amounts to AED
+  - `create_sales_journal_entry()` - converts export sale amounts to AED
+  - `get_receivables_report()` - returns AED-converted totals
+  - `get_payables_report()` - returns AED-converted totals for international purchases
+  - `ReceivablesPage.js` - displays AED amounts with original currency reference
+  - `PayablesPage.js` - displays AED amounts with original currency reference
+
 ## Recent Changes (March 9, 2026)
 
 ### New Features ✅ - Accounting Module Phase 2
@@ -193,14 +209,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] Trial Balance Report
 - [x] Scheduled Backups
 - [x] **Accounting Module Phase 1** - Chart of Accounts, Expenses, Income, Journal Entries, P&L, Balance Sheet
+- [x] **Accounting Module Phase 2** - Integrate Purchase/Sales with accounting (auto journal entries on posting)
+- [x] **Currency Conversion Bug Fix** - All financial reports now correctly convert foreign currency to AED
 
 ### P0 - In Progress
-- [ ] **Accounting Module Phase 2** - Integrate Purchase/Sales with accounting (auto journal entries on posting)
 - [ ] **Accounting Module Phase 3** - Accounting Settings page, fiscal year management
 - [ ] **Accounting Module Phase 4** - Role-based permissions for finance operations
 - [ ] **Accounting Module Phase 5** - Data migration script for existing companies
 
 ### P1 - High Priority (Next Sprint)
+- [ ] Windows Installer Package (using Inno Setup instead of PowerShell)
 - [ ] Add international suppliers/customers to seed data
 - [ ] Weighbridge hardware API integration placeholder
 - [ ] Currency revaluation
@@ -209,6 +227,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### P2 - Medium Priority
 - [ ] Break down server.py into modular routers (refactoring)
 - [ ] SaaS multi-tenancy architecture
+- [ ] Remove deprecated `journal_entries` collection
 
 ### P3 - Low Priority
 - [ ] Dashboard monthly charts with real data
