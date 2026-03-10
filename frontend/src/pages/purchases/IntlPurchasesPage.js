@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { intlPurchasesAPI, suppliersAPI } from '../../lib/api';
-import { formatCurrency, formatDate, getStatusColor } from '../../lib/utils';
+import { intlPurchasesAPI, companiesAPI } from '../../lib/api';
+import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Check, Globe, Pencil } from 'lucide-react';
+import { Plus, Eye, Loader2, Check, Globe, Pencil, Printer } from 'lucide-react';
 
 export default function IntlPurchasesPage() {
   const [purchases, setPurchases] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -16,8 +17,13 @@ export default function IntlPurchasesPage() {
 
   const loadData = async () => {
     try {
-      const res = await intlPurchasesAPI.list();
-      setPurchases(res.data);
+      const [purchasesRes, companiesRes] = await Promise.all([
+        intlPurchasesAPI.list(),
+        companiesAPI.list()
+      ]);
+      setPurchases(purchasesRes.data);
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load purchases');
     } finally {
@@ -63,7 +69,7 @@ export default function IntlPurchasesPage() {
                   <td>{po.currency}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(po.landed_cost, po.currency)}</td>
                   <td><Badge className={`${getStatusColor(po.status)} border rounded-full text-xs`}>{po.status}</Badge></td>
-                  <td><div className="flex gap-2"><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="ghost" onClick={() => navigate(`/intl-purchases/${po.id}/edit`)}><Pencil className="w-4 h-4" /></Button>}{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="outline" onClick={() => handlePost(po.id)}><Check className="w-4 h-4 mr-1" />Post</Button>}</div></td>
+                  <td><div className="flex gap-2"><Button size="sm" variant="ghost"><Eye className="w-4 h-4" /></Button>{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="ghost" onClick={() => navigate(`/intl-purchases/${po.id}/edit`)}><Pencil className="w-4 h-4" /></Button>}<Button size="sm" variant="ghost" onClick={() => { const html = generatePOPrintHTML(po, company); printDocument(html, `IPO-${po.order_number}`); }}><Printer className="w-4 h-4" /></Button>{po.status !== 'posted' && po.status !== 'cancelled' && <Button size="sm" variant="outline" onClick={() => handlePost(po.id)}><Check className="w-4 h-4 mr-1" />Post</Button>}</div></td>
                 </tr>
               ))
             )}

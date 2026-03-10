@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { exportSalesAPI, customersAPI } from '../../lib/api';
+import { exportSalesAPI, customersAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generateExportSalesPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -10,14 +10,21 @@ import { Plus, Eye, Loader2, Check, Globe, Printer, Pencil } from 'lucide-react'
 export default function ExportSalesPage() {
   const navigate = useNavigate();
   const [sales, setSales] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
-      const res = await exportSalesAPI.list();
-      setSales(res.data);
+      const [salesRes, companiesRes] = await Promise.all([
+        exportSalesAPI.list(),
+        companiesAPI.list()
+      ]);
+      setSales(salesRes.data);
+      // Get the first active company
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load sales');
     } finally {
@@ -74,7 +81,7 @@ export default function ExportSalesPage() {
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => {
-                        const html = generateExportSalesPrintHTML(s);
+                        const html = generateExportSalesPrintHTML(s, company);
                         printDocument(html, `ESC-${s.order_number || s.contract_number}`);
                       }} data-testid={`esc-print-${s.id}`}>
                         <Printer className="w-4 h-4" />

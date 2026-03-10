@@ -137,11 +137,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 
 ### New Feature ✅ - Print Vouchers for Expenses and Income
 - **Expense Voucher Printing**: Print icon in Actions column for each expense entry
-  - Professional voucher format with header, account details, debit/credit breakdown
+  - Professional voucher format with company logo, header, account details, debit/credit breakdown
   - Signature lines for Prepared By, Approved By, Received By
 - **Income Receipt Voucher Printing**: Print icon in Actions column for each income entry
-  - Professional receipt format with income account, payment method, amounts
+  - Professional receipt format with company logo, income account, payment method, amounts
   - Signature lines for Prepared By, Approved By, Paid By
+
+### Bug Fix ✅ - Company Logo in Print Documents
+- Fixed company logo not showing in print documents
+- Updated all list pages (Export Sales, Local Sales, Local Purchases, International Purchases, Expenses, Income) to fetch company data and pass it to print functions
+- All print documents now display company logo, name, address, phone, and email
 
 ## Recent Changes (March 9, 2026)
 

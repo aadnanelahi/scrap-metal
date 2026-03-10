@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { localSalesAPI, customersAPI, branchesAPI, scrapItemsAPI, vatCodesAPI, brokersAPI, companiesAPI } from '../../lib/api';
+import { localSalesAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generateSOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -9,6 +9,7 @@ import { Plus, Eye, Printer, Loader2, Check, Truck } from 'lucide-react';
 
 export default function LocalSalesPage() {
   const [sales, setSales] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -18,8 +19,13 @@ export default function LocalSalesPage() {
 
   const loadData = async () => {
     try {
-      const res = await localSalesAPI.list();
-      setSales(res.data);
+      const [salesRes, companiesRes] = await Promise.all([
+        localSalesAPI.list(),
+        companiesAPI.list()
+      ]);
+      setSales(salesRes.data);
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load sales');
     } finally {
@@ -109,7 +115,7 @@ export default function LocalSalesPage() {
                         <Eye className="w-4 h-4" />
                       </Button>
                       <Button size="sm" variant="ghost" onClick={() => {
-                        const html = generateSOPrintHTML(so);
+                        const html = generateSOPrintHTML(so, company);
                         printDocument(html, `SO-${so.order_number}`);
                       }} data-testid={`lso-print-btn-${so.id}`}>
                         <Printer className="w-4 h-4" />

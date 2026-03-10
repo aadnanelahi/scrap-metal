@@ -14,6 +14,7 @@ import { Label } from '../../components/ui/label';
 export default function LocalPurchasesPage() {
   const { user } = useAuth();
   const [purchases, setPurchases] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelId, setCancelId] = useState(null);
@@ -29,8 +30,13 @@ export default function LocalPurchasesPage() {
 
   const loadData = async () => {
     try {
-      const res = await localPurchasesAPI.list();
-      setPurchases(res.data);
+      const [purchasesRes, companiesRes] = await Promise.all([
+        localPurchasesAPI.list(),
+        companiesAPI.list()
+      ]);
+      setPurchases(purchasesRes.data);
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load purchases');
     } finally {
@@ -150,7 +156,7 @@ export default function LocalPurchasesPage() {
                         </Button>
                       )}
                       <Button size="sm" variant="ghost" onClick={() => {
-                        const html = generatePOPrintHTML(po);
+                        const html = generatePOPrintHTML(po, company);
                         printDocument(html, `PO-${po.order_number}`);
                       }} data-testid={`lpo-print-btn-${po.id}`}>
                         <Printer className="w-4 h-4" />

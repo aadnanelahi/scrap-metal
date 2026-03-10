@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { expensesAPI, chartOfAccountsAPI } from '../../lib/api';
+import { expensesAPI, chartOfAccountsAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, toISODateString, printDocument } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -15,6 +15,7 @@ export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([]);
   const [expenseAccounts, setExpenseAccounts] = useState([]);
   const [paymentAccounts, setPaymentAccounts] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -38,9 +39,10 @@ export default function ExpensesPage() {
 
   const loadData = async () => {
     try {
-      const [expRes, accRes] = await Promise.all([
+      const [expRes, accRes, companiesRes] = await Promise.all([
         expensesAPI.list(),
-        chartOfAccountsAPI.list()
+        chartOfAccountsAPI.list(),
+        companiesAPI.list()
       ]);
       setExpenses(expRes.data || []);
       
@@ -51,6 +53,9 @@ export default function ExpensesPage() {
         !a.is_header && 
         (a.account_name.toLowerCase().includes('cash') || a.account_name.toLowerCase().includes('bank'))
       ));
+      
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -116,10 +121,20 @@ export default function ExpensesPage() {
   };
 
   const handlePrintVoucher = (expense) => {
+    const companyName = company?.name || 'ScrapOS Trading LLC';
+    const companyLogo = company?.logo || '';
+    const companyAddress = company?.address || '';
+    const companyPhone = company?.phone || '';
+    const companyEmail = company?.email || '';
+    const logoHTML = companyLogo ? `<img src="${companyLogo}" alt="${companyName}" style="max-height:70px;max-width:180px;object-fit:contain;margin-bottom:10px;" />` : '';
+    
     const html = `
       <div style="text-align:center;margin-bottom:30px;">
-        <h1 style="margin:0;font-size:24px;">EXPENSE VOUCHER</h1>
-        <p style="margin:5px 0;color:#666;">ScrapOS ERP System</p>
+        ${logoHTML}
+        <h2 style="margin:0;font-size:18px;">${companyName}</h2>
+        ${companyAddress ? `<p style="margin:5px 0;font-size:11px;color:#666;">${companyAddress}</p>` : ''}
+        ${companyPhone || companyEmail ? `<p style="margin:5px 0;font-size:11px;color:#666;">${[companyPhone, companyEmail].filter(Boolean).join(' | ')}</p>` : ''}
+        <h1 style="margin:15px 0 0;font-size:20px;border-top:2px solid #1e293b;padding-top:15px;">EXPENSE VOUCHER</h1>
       </div>
       
       <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
