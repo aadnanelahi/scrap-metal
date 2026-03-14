@@ -5,7 +5,7 @@ import { formatCurrency, formatDate, getStatusColor, printDocument, generatePOPr
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, Loader2, Check, ShoppingCart, Pencil, X } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, ShoppingCart, Pencil, X, Trash2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
@@ -20,9 +20,13 @@ export default function LocalPurchasesPage() {
   const [cancelId, setCancelId] = useState(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
   
   const isManager = user?.role === 'admin' || user?.role === 'manager';
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadData();
@@ -76,6 +80,21 @@ export default function LocalPurchasesPage() {
       toast.error(error.response?.data?.detail || 'Failed to cancel');
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const result = await localPurchasesAPI.delete(deleteId);
+      toast.success(`Deleted! ${result.data.deleted_journal_entries} journal entries removed.`);
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -185,6 +204,19 @@ export default function LocalPurchasesPage() {
                           <X className="w-4 h-4" />
                         </Button>
                       )}
+                      {/* Delete: Admin only */}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(po.id); setDeleteDialogOpen(true); }}
+                          data-testid={`lpo-delete-btn-${po.id}`}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -221,6 +253,34 @@ export default function LocalPurchasesPage() {
             <Button variant="destructive" onClick={handleCancel} disabled={cancelling}>
               {cancelling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Cancel PO
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Purchase Order</DialogTitle>
+            <DialogDescription>
+              <span className="text-red-600 font-semibold">Warning:</span> This action cannot be undone. 
+              This will permanently delete the purchase order and ALL related accounting entries 
+              (journal entries, balance sheet impact, P&L impact, payments).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you absolutely sure you want to delete this purchase order?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete Permanently
             </Button>
           </DialogFooter>
         </DialogContent>

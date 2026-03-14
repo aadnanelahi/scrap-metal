@@ -4,14 +4,22 @@ import { exportSalesAPI, customersAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generateExportSalesPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Eye, Loader2, Check, Globe, Printer, Pencil } from 'lucide-react';
+import { Plus, Eye, Loader2, Check, Globe, Printer, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ExportSalesPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [sales, setSales] = useState([]);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => { loadData(); }, []);
 
@@ -29,6 +37,21 @@ export default function ExportSalesPage() {
       toast.error('Failed to load sales');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const result = await exportSalesAPI.delete(deleteId);
+      toast.success(`Deleted! ${result.data.deleted_journal_entries} journal entries removed.`);
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -91,6 +114,19 @@ export default function ExportSalesPage() {
                           <Check className="w-4 h-4 mr-1" />Post
                         </Button>
                       )}
+                      {/* Delete: Admin only */}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(s.id); setDeleteDialogOpen(true); }}
+                          data-testid={`esc-delete-${s.id}`}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -99,6 +135,34 @@ export default function ExportSalesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Export Contract</DialogTitle>
+            <DialogDescription>
+              <span className="text-red-600 font-semibold">Warning:</span> This action cannot be undone. 
+              This will permanently delete the export contract and ALL related accounting entries 
+              (journal entries, receivables, P&L impact, payments).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you absolutely sure you want to delete this export contract?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

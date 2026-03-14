@@ -1233,6 +1233,40 @@ async def cancel_local_purchase(po_id: str, data: Dict, current_user: Dict = Dep
     await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_purchase', po_id)
     return {"message": "Purchase order cancelled"}
 
+@api_router.delete("/local-purchases/{po_id}")
+async def delete_local_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete a purchase order and all related accounting entries (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
+    
+    po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Delete related journal entries from accounting
+    deleted_je = await db.accounting_journal_entries.delete_many({
+        "reference_id": po_id,
+        "reference_type": {"$in": ["local_purchase", "intl_purchase"]}
+    })
+    
+    # Delete from legacy journal entries
+    await db.journal_entries.delete_many({
+        "reference_id": po_id
+    })
+    
+    # Delete related payments
+    deleted_payments = await db.payments.delete_many({"reference_id": po_id})
+    
+    # Delete the purchase order
+    await db.local_purchases.delete_one({"id": po_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'local_purchase', po_id)
+    return {
+        "message": "Purchase order and related entries deleted permanently",
+        "deleted_journal_entries": deleted_je.deleted_count,
+        "deleted_payments": deleted_payments.deleted_count
+    }
+
 # ==================== INTERNATIONAL PURCHASES ====================
 @api_router.get("/intl-purchases", response_model=List[Dict])
 async def list_intl_purchases(
@@ -1370,6 +1404,38 @@ async def cancel_intl_purchase(po_id: str, data: Dict, current_user: Dict = Depe
     
     await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'intl_purchase', po_id)
     return {"message": "International purchase order cancelled"}
+
+@api_router.delete("/intl-purchases/{po_id}")
+async def delete_intl_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete an international purchase order and all related accounting entries (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
+    
+    po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
+    if not po:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    
+    # Delete related journal entries from accounting
+    deleted_je = await db.accounting_journal_entries.delete_many({
+        "reference_id": po_id,
+        "reference_type": {"$in": ["local_purchase", "intl_purchase"]}
+    })
+    
+    # Delete from legacy journal entries
+    await db.journal_entries.delete_many({"reference_id": po_id})
+    
+    # Delete related payments
+    deleted_payments = await db.payments.delete_many({"reference_id": po_id})
+    
+    # Delete the purchase order
+    await db.intl_purchases.delete_one({"id": po_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'intl_purchase', po_id)
+    return {
+        "message": "International purchase order and related entries deleted permanently",
+        "deleted_journal_entries": deleted_je.deleted_count,
+        "deleted_payments": deleted_payments.deleted_count
+    }
 
 # ==================== LOCAL SALES ====================
 @api_router.get("/local-sales", response_model=List[Dict])
@@ -1526,6 +1592,38 @@ async def cancel_local_sale(so_id: str, data: Dict, current_user: Dict = Depends
     await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'local_sale', so_id)
     return {"message": "Sales order cancelled"}
 
+@api_router.delete("/local-sales/{so_id}")
+async def delete_local_sale(so_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete a sales order and all related accounting entries (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
+    
+    so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
+    if not so:
+        raise HTTPException(status_code=404, detail="Sales order not found")
+    
+    # Delete related journal entries from accounting
+    deleted_je = await db.accounting_journal_entries.delete_many({
+        "reference_id": so_id,
+        "reference_type": {"$in": ["local_sale", "export_sale"]}
+    })
+    
+    # Delete from legacy journal entries
+    await db.journal_entries.delete_many({"reference_id": so_id})
+    
+    # Delete related payments/receipts
+    deleted_payments = await db.payments.delete_many({"reference_id": so_id})
+    
+    # Delete the sales order
+    await db.local_sales.delete_one({"id": so_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'local_sale', so_id)
+    return {
+        "message": "Sales order and related entries deleted permanently",
+        "deleted_journal_entries": deleted_je.deleted_count,
+        "deleted_payments": deleted_payments.deleted_count
+    }
+
 # ==================== EXPORT SALES ====================
 @api_router.get("/export-sales", response_model=List[Dict])
 async def list_export_sales(
@@ -1670,6 +1768,38 @@ async def cancel_export_sale(contract_id: str, data: Dict, current_user: Dict = 
     
     await log_audit(current_user['id'], current_user['email'], 'CANCEL', 'export_sale', contract_id)
     return {"message": "Export contract cancelled"}
+
+@api_router.delete("/export-sales/{contract_id}")
+async def delete_export_sale(contract_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete an export sales contract and all related accounting entries (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
+    
+    contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
+    if not contract:
+        raise HTTPException(status_code=404, detail="Export contract not found")
+    
+    # Delete related journal entries from accounting
+    deleted_je = await db.accounting_journal_entries.delete_many({
+        "reference_id": contract_id,
+        "reference_type": {"$in": ["local_sale", "export_sale"]}
+    })
+    
+    # Delete from legacy journal entries
+    await db.journal_entries.delete_many({"reference_id": contract_id})
+    
+    # Delete related payments/receipts
+    deleted_payments = await db.payments.delete_many({"reference_id": contract_id})
+    
+    # Delete the export contract
+    await db.export_sales.delete_one({"id": contract_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'export_sale', contract_id)
+    return {
+        "message": "Export contract and related entries deleted permanently",
+        "deleted_journal_entries": deleted_je.deleted_count,
+        "deleted_payments": deleted_payments.deleted_count
+    }
 
 # ==================== INVENTORY FUNCTIONS ====================
 async def update_inventory(item_id: str, item_name: str, branch_id: str, quantity: float, 
@@ -3625,6 +3755,37 @@ async def reverse_journal_entry(entry_id: str, data: Dict, current_user: Dict = 
     await log_audit(current_user['id'], current_user['email'], 'REVERSE', 'journal_entry', entry_id)
     return {**reversal_entry, "_id": None}
 
+@api_router.delete("/accounting/journal-entries/{entry_id}")
+async def delete_journal_entry(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete a journal entry (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
+    
+    entry = await db.accounting_journal_entries.find_one({"id": entry_id}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Journal entry not found")
+    
+    # Reverse account balance updates
+    for line in entry.get('lines', []):
+        if line.get('account_id'):
+            balance_change = line.get('credit_amount', 0) - line.get('debit_amount', 0)
+            account = await db.chart_of_accounts.find_one({"id": line['account_id']}, {"_id": 0})
+            if account and account.get('normal_balance') == 'credit':
+                balance_change = -balance_change
+            await db.chart_of_accounts.update_one(
+                {"id": line['account_id']},
+                {"$inc": {"current_balance": balance_change}}
+            )
+    
+    # Delete the journal entry
+    await db.accounting_journal_entries.delete_one({"id": entry_id})
+    
+    # Also delete from legacy if exists
+    await db.journal_entries.delete_one({"id": entry_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'journal_entry', entry_id)
+    return {"message": "Journal entry deleted permanently"}
+
 # Expense Entries API
 @api_router.get("/accounting/expenses")
 async def list_expenses(
@@ -3735,6 +3896,38 @@ async def create_expense(data: Dict, current_user: Dict = Depends(get_current_us
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'expense_entry', expense['id'])
     return {**expense, "_id": None}
 
+@api_router.delete("/accounting/expenses/{expense_id}")
+async def delete_expense(expense_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete an expense entry and its related journal entry (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
+    
+    expense = await db.expense_entries.find_one({"id": expense_id}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense entry not found")
+    
+    # Delete related journal entry
+    if expense.get('journal_entry_id'):
+        await db.accounting_journal_entries.delete_one({"id": expense['journal_entry_id']})
+    
+    # Reverse account balance updates
+    if expense.get('expense_account_id'):
+        await db.chart_of_accounts.update_one(
+            {"id": expense['expense_account_id']},
+            {"$inc": {"current_balance": -expense['amount']}}
+        )
+    if expense.get('payment_account_id'):
+        await db.chart_of_accounts.update_one(
+            {"id": expense['payment_account_id']},
+            {"$inc": {"current_balance": expense['amount']}}
+        )
+    
+    # Delete the expense entry
+    await db.expense_entries.delete_one({"id": expense_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'expense_entry', expense_id)
+    return {"message": "Expense entry and related journal entry deleted permanently"}
+
 # Income Entries API
 @api_router.get("/accounting/income")
 async def list_income(
@@ -3842,6 +4035,38 @@ async def create_income(data: Dict, current_user: Dict = Depends(get_current_use
     
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'income_entry', income['id'])
     return {**income, "_id": None}
+
+@api_router.delete("/accounting/income/{income_id}")
+async def delete_income(income_id: str, current_user: Dict = Depends(get_current_user)):
+    """Permanently delete an income entry and its related journal entry (Admin only)"""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
+    
+    income = await db.income_entries.find_one({"id": income_id}, {"_id": 0})
+    if not income:
+        raise HTTPException(status_code=404, detail="Income entry not found")
+    
+    # Delete related journal entry
+    if income.get('journal_entry_id'):
+        await db.accounting_journal_entries.delete_one({"id": income['journal_entry_id']})
+    
+    # Reverse account balance updates
+    if income.get('payment_account_id'):
+        await db.chart_of_accounts.update_one(
+            {"id": income['payment_account_id']},
+            {"$inc": {"current_balance": -income['amount']}}
+        )
+    if income.get('income_account_id'):
+        await db.chart_of_accounts.update_one(
+            {"id": income['income_account_id']},
+            {"$inc": {"current_balance": -income['amount']}}
+        )
+    
+    # Delete the income entry
+    await db.income_entries.delete_one({"id": income_id})
+    
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'income_entry', income_id)
+    return {"message": "Income entry and related journal entry deleted permanently"}
 
 # Account Settings API
 @api_router.get("/accounting/settings")

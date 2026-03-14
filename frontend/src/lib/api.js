@@ -171,6 +171,7 @@ export const localPurchasesAPI = {
   update: (id, data) => api.put(`/local-purchases/${id}`, data),
   post: (id) => api.post(`/local-purchases/${id}/post`),
   cancel: (id, data) => api.post(`/local-purchases/${id}/cancel`, data),
+  delete: (id) => api.delete(`/local-purchases/${id}`),
 };
 
 // International Purchases
@@ -181,6 +182,7 @@ export const intlPurchasesAPI = {
   update: (id, data) => api.put(`/intl-purchases/${id}`, data),
   post: (id) => api.post(`/intl-purchases/${id}/post`),
   cancel: (id, data) => api.post(`/intl-purchases/${id}/cancel`, data),
+  delete: (id) => api.delete(`/intl-purchases/${id}`),
 };
 
 // Local Sales
@@ -191,6 +193,7 @@ export const localSalesAPI = {
   update: (id, data) => api.put(`/local-sales/${id}`, data),
   post: (id) => api.post(`/local-sales/${id}/post`),
   cancel: (id, data) => api.post(`/local-sales/${id}/cancel`, data),
+  delete: (id) => api.delete(`/local-sales/${id}`),
 };
 
 // Export Sales
@@ -201,6 +204,7 @@ export const exportSalesAPI = {
   update: (id, data) => api.put(`/export-sales/${id}`, data),
   post: (id) => api.post(`/export-sales/${id}/post`),
   cancel: (id, data) => api.post(`/export-sales/${id}/cancel`, data),
+  delete: (id) => api.delete(`/export-sales/${id}`),
 };
 
 // Inventory
@@ -263,16 +267,19 @@ export const journalEntriesAPI = {
   get: (id) => api.get(`/accounting/journal-entries/${id}`),
   create: (data) => api.post('/accounting/journal-entries', data),
   reverse: (id, data) => api.post(`/accounting/journal-entries/${id}/reverse`, data),
+  delete: (id) => api.delete(`/accounting/journal-entries/${id}`),
 };
 
 export const expensesAPI = {
   list: (params) => api.get('/accounting/expenses', { params }),
   create: (data) => api.post('/accounting/expenses', data),
+  delete: (id) => api.delete(`/accounting/expenses/${id}`),
 };
 
 export const incomeAPI = {
   list: (params) => api.get('/accounting/income', { params }),
   create: (data) => api.post('/accounting/income', data),
+  delete: (id) => api.delete(`/accounting/income/${id}`),
 };
 
 export const accountSettingsAPI = {
