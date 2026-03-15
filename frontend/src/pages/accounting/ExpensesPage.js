@@ -127,6 +127,21 @@ export default function ExpensesPage() {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await expensesAPI.delete(deleteId);
+      toast.success('Expense entry and related journal entry deleted');
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handlePrintVoucher = (expense) => {
     const companyName = company?.name || 'ScrapOS Trading LLC';
     const companyLogo = company?.logo || '';
@@ -323,14 +338,27 @@ export default function ExpensesPage() {
                     <Badge className="bg-emerald-100 text-emerald-800">Posted</Badge>
                   </td>
                   <td className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePrintVoucher(exp)}
-                      title="Print Voucher"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1 justify-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handlePrintVoucher(exp)}
+                        title="Print Voucher"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(exp.id); setDeleteDialogOpen(true); }}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -338,6 +366,31 @@ export default function ExpensesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Expense</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the expense entry and its related journal entry.
+              Account balances will be reversed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you sure you want to delete this expense entry?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New Expense Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

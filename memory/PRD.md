@@ -121,6 +121,15 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Handled reference number format mismatches (EXP-2026-03-0001 vs EXP-202603-0001)
 - **Results**: P&L now shows correct AED 63,144.37 for Export Sales (was USD 17,206.02)
 
+### Feature ✅ - Admin Delete Functionality (Complete)
+- Added delete buttons to ALL document pages (Admin only):
+  - Local Purchases, International Purchases
+  - Local Sales, Export Sales
+  - Expenses, Income, Journal Entries
+- Delete removes document AND all related journal entries
+- Account balances are automatically reversed
+- Confirmation dialog with warning before deletion
+
 ## Recent Changes (March 10, 2026)
 
 ### Bug Fix ✅ - Currency Conversion in Financial Reports

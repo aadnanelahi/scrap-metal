@@ -7,11 +7,13 @@ import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, TrendingUp, Wallet, Calendar, Printer } from 'lucide-react';
+import { Plus, Loader2, TrendingUp, Wallet, Calendar, Printer, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function IncomePage() {
+  const { user } = useAuth();
   const [incomeEntries, setIncomeEntries] = useState([]);
   const [incomeAccounts, setIncomeAccounts] = useState([]);
   const [paymentAccounts, setPaymentAccounts] = useState([]);
@@ -19,6 +21,11 @@ export default function IncomePage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
   
   const [formData, setFormData] = useState({
     income_date: toISODateString(new Date()),
@@ -117,6 +124,21 @@ export default function IncomePage() {
       toast.error(error.response?.data?.detail || 'Failed to save income');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await incomeAPI.delete(deleteId);
+      toast.success('Income entry and related journal entry deleted');
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -316,14 +338,27 @@ export default function IncomePage() {
                     <Badge className="bg-emerald-100 text-emerald-800">Posted</Badge>
                   </td>
                   <td className="text-center">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      onClick={() => handlePrintVoucher(inc)}
-                      title="Print Voucher"
-                    >
-                      <Printer className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-1 justify-center">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handlePrintVoucher(inc)}
+                        title="Print Voucher"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(inc.id); setDeleteDialogOpen(true); }}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -331,6 +366,31 @@ export default function IncomePage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Income</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the income entry and its related journal entry.
+              Account balances will be reversed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you sure you want to delete this income entry?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New Income Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

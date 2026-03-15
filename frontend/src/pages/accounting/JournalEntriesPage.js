@@ -7,20 +7,27 @@ import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 import { Plus, Loader2, BookOpen, Eye, RotateCcw, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function JournalEntriesPage() {
+  const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [reverseDialogOpen, setReverseDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [saving, setSaving] = useState(false);
   const [reverseReason, setReverseReason] = useState('');
+  
+  const isAdmin = user?.role === 'admin';
   
   const [formData, setFormData] = useState({
     entry_date: toISODateString(new Date()),
@@ -171,6 +178,21 @@ export default function JournalEntriesPage() {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await journalEntriesAPI.delete(deleteId);
+      toast.success('Journal entry deleted permanently');
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const totals = calculateTotals();
 
   if (loading) {
@@ -257,6 +279,17 @@ export default function JournalEntriesPage() {
                           <RotateCcw className="w-4 h-4" />
                         </Button>
                       )}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(entry.id); setDeleteDialogOpen(true); }}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -265,6 +298,31 @@ export default function JournalEntriesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Journal Entry</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the journal entry.
+              Account balances will be reversed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you sure you want to delete this journal entry?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
