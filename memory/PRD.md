@@ -111,6 +111,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### ✅ Custom Branding
 - TechSight Innovation branding on login page and sidebar
 
+## Recent Changes (March 15, 2026)
+
+### Bug Fix ✅ - Complete Currency Conversion Fix
+- **Fixed ALL currency conversion issues in financial reports**
+- Created admin utility `/api/admin/fix-currency-conversion` to recalculate existing journal entries
+- Fixed export sale journal entries (Accounts Receivable, Sales Revenue) - now stored in AED
+- Fixed manual income entries that reference export sales - now converted to AED
+- Handled reference number format mismatches (EXP-2026-03-0001 vs EXP-202603-0001)
+- **Results**: P&L now shows correct AED 63,144.37 for Export Sales (was USD 17,206.02)
+
 ## Recent Changes (March 10, 2026)
 
 ### Bug Fix ✅ - Currency Conversion in Financial Reports

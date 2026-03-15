@@ -5005,6 +5005,211 @@ async def seed_data(current_user: Dict = Depends(get_current_user)):
     
     return {"message": "Seed data created successfully"}
 
+# ==================== ADMIN UTILITIES ====================
+@api_router.post("/admin/fix-currency-conversion")
+async def fix_currency_conversion(current_user: Dict = Depends(get_current_user)):
+    """Admin utility to fix journal entries with incorrect currency conversion.
+    This will recalculate journal entries from export sales and international purchases
+    to use proper AED amounts based on exchange rates."""
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can run this utility")
+    
+    company_id = await get_user_company_id(current_user)
+    fixed_count = 0
+    
+    # Find export sale journal entries that need fixing
+    export_entries = await db.accounting_journal_entries.find({
+        "company_id": company_id,
+        "source": "auto_sale",
+        "reference_type": "export_sale"
+    }, {"_id": 0}).to_list(500)
+    
+    for entry in export_entries:
+        # Get the original export sale to get currency info
+        export_sale = await db.export_sales.find_one({"id": entry.get("reference_id")}, {"_id": 0})
+        if not export_sale:
+            continue
+            
+        currency = export_sale.get('currency', 'AED')
+        exchange_rate = float(export_sale.get('exchange_rate', 1) or 1)
+        
+        if currency == 'AED' or exchange_rate == 1:
+            continue  # Already in AED, no fix needed
+        
+        # Check if already fixed
+        if entry.get('currency_fixed_at'):
+            continue
+        
+        # Recalculate line amounts in AED
+        new_lines = []
+        for line in entry.get('lines', []):
+            # Skip COGS and Inventory lines - they're already in AED from inventory costing
+            if line.get('account_code') in ['5100', '1300']:
+                new_lines.append(line)
+                continue
+            
+            # Convert to AED
+            new_line = line.copy()
+            if new_line.get('debit_amount', 0) > 0:
+                new_line['debit_amount'] = round(new_line['debit_amount'] * exchange_rate, 2)
+            if new_line.get('credit_amount', 0) > 0:
+                new_line['credit_amount'] = round(new_line['credit_amount'] * exchange_rate, 2)
+            new_lines.append(new_line)
+        
+        total_debit = sum(l.get('debit_amount', 0) for l in new_lines)
+        total_credit = sum(l.get('credit_amount', 0) for l in new_lines)
+        
+        # Update the journal entry
+        await db.accounting_journal_entries.update_one(
+            {"id": entry['id']},
+            {"$set": {
+                "lines": new_lines,
+                "total_debit": round(total_debit, 2),
+                "total_credit": round(total_credit, 2),
+                "original_currency": currency,
+                "exchange_rate": exchange_rate,
+                "base_currency": "AED",
+                "currency_fixed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        fixed_count += 1
+    
+    # Find international purchase journal entries that need fixing
+    intl_entries = await db.accounting_journal_entries.find({
+        "company_id": company_id,
+        "source": "auto_purchase",
+        "reference_type": "intl_purchase"
+    }, {"_id": 0}).to_list(500)
+    
+    for entry in intl_entries:
+        if entry.get('currency_fixed_at'):
+            continue
+            
+        intl_purchase = await db.intl_purchases.find_one({"id": entry.get("reference_id")}, {"_id": 0})
+        if not intl_purchase:
+            continue
+            
+        currency = intl_purchase.get('currency', 'AED')
+        exchange_rate = float(intl_purchase.get('exchange_rate', 1) or 1)
+        
+        if currency == 'AED' or exchange_rate == 1:
+            continue
+        
+        new_lines = []
+        for line in entry.get('lines', []):
+            new_line = line.copy()
+            if new_line.get('debit_amount', 0) > 0:
+                new_line['debit_amount'] = round(new_line['debit_amount'] * exchange_rate, 2)
+            if new_line.get('credit_amount', 0) > 0:
+                new_line['credit_amount'] = round(new_line['credit_amount'] * exchange_rate, 2)
+            new_lines.append(new_line)
+        
+        total_debit = sum(l.get('debit_amount', 0) for l in new_lines)
+        total_credit = sum(l.get('credit_amount', 0) for l in new_lines)
+        
+        await db.accounting_journal_entries.update_one(
+            {"id": entry['id']},
+            {"$set": {
+                "lines": new_lines,
+                "total_debit": round(total_debit, 2),
+                "total_credit": round(total_credit, 2),
+                "original_currency": currency,
+                "exchange_rate": exchange_rate,
+                "base_currency": "AED",
+                "currency_fixed_at": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        fixed_count += 1
+    
+    # Fix manual income entries that reference export sales
+    income_entries = await db.income_entries.find({
+        "company_id": company_id
+    }, {"_id": 0}).to_list(500)
+    
+    for income in income_entries:
+        ref_num = income.get('reference_number', '')
+        # Normalize reference number for matching (remove dashes from date part)
+        ref_num_normalized = ref_num.replace('-', '')
+        
+        # Check if this references an export sale
+        export_sale = None
+        
+        # Try exact match first
+        export_sale = await db.export_sales.find_one({
+            "company_id": company_id,
+            "$or": [
+                {"order_number": ref_num},
+                {"contract_number": ref_num}
+            ]
+        }, {"_id": 0})
+        
+        # Try normalized match if exact match failed
+        if not export_sale:
+            all_exports = await db.export_sales.find({"company_id": company_id}, {"_id": 0}).to_list(100)
+            for exp in all_exports:
+                exp_order = (exp.get('order_number') or '').replace('-', '')
+                exp_contract = (exp.get('contract_number') or '').replace('-', '')
+                if ref_num_normalized == exp_order or ref_num_normalized == exp_contract:
+                    export_sale = exp
+                    break
+        
+        if not export_sale:
+            continue
+            
+        currency = export_sale.get('currency', 'AED')
+        exchange_rate = float(export_sale.get('exchange_rate', 1) or 1)
+        
+        if currency == 'AED' or exchange_rate == 1:
+            continue
+        
+        # Check if amount matches the original currency amount
+        original_amount = float(export_sale.get('total_amount', 0))
+        current_amount = float(income.get('amount', 0))
+        
+        # If the income amount matches the original USD amount (within tolerance)
+        if abs(current_amount - original_amount) < 10:
+            aed_amount = round(current_amount * exchange_rate, 2)
+            
+            # Update income entry
+            await db.income_entries.update_one(
+                {"id": income['id']},
+                {"$set": {"amount": aed_amount, "original_currency": currency, "exchange_rate": exchange_rate}}
+            )
+            
+            # Update related journal entry
+            if income.get('journal_entry_id'):
+                je = await db.accounting_journal_entries.find_one({"id": income['journal_entry_id']}, {"_id": 0})
+                if je:
+                    new_lines = []
+                    for line in je.get('lines', []):
+                        new_line = line.copy()
+                        if new_line.get('debit_amount', 0) > 0:
+                            new_line['debit_amount'] = aed_amount
+                        if new_line.get('credit_amount', 0) > 0:
+                            new_line['credit_amount'] = aed_amount
+                        new_lines.append(new_line)
+                    
+                    await db.accounting_journal_entries.update_one(
+                        {"id": income['journal_entry_id']},
+                        {"$set": {
+                            "lines": new_lines,
+                            "total_debit": aed_amount,
+                            "total_credit": aed_amount,
+                            "original_currency": currency,
+                            "exchange_rate": exchange_rate,
+                            "base_currency": "AED",
+                            "currency_fixed_at": datetime.now(timezone.utc).isoformat()
+                        }}
+                    )
+            fixed_count += 1
+    
+    await log_audit(current_user['id'], current_user['email'], 'FIX_CURRENCY', 'journal_entries', str(fixed_count))
+    
+    return {
+        "message": f"Currency conversion fix completed",
+        "fixed_entries": fixed_count
+    }
+
 # ==================== HEALTH CHECK ====================
 @api_router.get("/")
 async def root():

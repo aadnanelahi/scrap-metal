@@ -4,14 +4,22 @@ import { localSalesAPI, companiesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, getStatusColor, printDocument, generateSOPrintHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Eye, Printer, Loader2, Check, Truck } from 'lucide-react';
+import { Plus, Eye, Printer, Loader2, Check, Truck, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function LocalSalesPage() {
+  const { user } = useAuth();
   const [sales, setSales] = useState([]);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const navigate = useNavigate();
+  
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     loadData();
@@ -41,6 +49,21 @@ export default function LocalSalesPage() {
     } catch (error) {
       const message = error.response?.data?.detail || 'Failed to post';
       toast.error(message);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      const result = await localSalesAPI.delete(deleteId);
+      toast.success(`Deleted! ${result.data.deleted_journal_entries} journal entries removed.`);
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -131,6 +154,18 @@ export default function LocalSalesPage() {
                           Post
                         </Button>
                       )}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(so.id); setDeleteDialogOpen(true); }}
+                          data-testid={`lso-delete-btn-${so.id}`}
+                          title="Delete permanently"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -139,6 +174,31 @@ export default function LocalSalesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Dialog - Admin Only */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Permanently Delete Sales Order</DialogTitle>
+            <DialogDescription>
+              <span className="text-red-600 font-semibold">Warning:</span> This action cannot be undone. 
+              This will permanently delete the sales order and ALL related accounting entries.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 bg-red-50 dark:bg-red-900/20 p-4 rounded-lg">
+            <p className="text-sm text-red-800 dark:text-red-200">
+              Are you absolutely sure you want to delete this sales order?
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trash2 className="w-4 h-4 mr-2" />}
+              Delete Permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -7,11 +7,13 @@ import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, Receipt, Wallet, Building, Printer } from 'lucide-react';
+import { Plus, Loader2, Receipt, Wallet, Building, Printer, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function ExpensesPage() {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [expenseAccounts, setExpenseAccounts] = useState([]);
   const [paymentAccounts, setPaymentAccounts] = useState([]);
@@ -19,6 +21,11 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
   
   const [formData, setFormData] = useState({
     expense_date: toISODateString(new Date()),
