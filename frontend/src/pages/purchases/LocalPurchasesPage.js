@@ -134,6 +134,7 @@ export default function LocalPurchasesPage() {
               <th>PO Number</th>
               <th>Date</th>
               <th>Supplier</th>
+              <th className="text-right">Qty MT</th>
               <th className="text-right">Subtotal</th>
               <th className="text-right">VAT</th>
               <th className="text-right">Total</th>
@@ -144,17 +145,21 @@ export default function LocalPurchasesPage() {
           <tbody>
             {purchases.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-slate-400">
+                <td colSpan={9} className="text-center py-12 text-slate-400">
                   <ShoppingCart className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>No local purchases yet</p>
                 </td>
               </tr>
             ) : (
-              purchases.map((po) => (
+              purchases.map((po) => {
+                // Calculate total quantity from lines
+                const totalQty = (po.lines || []).reduce((sum, line) => sum + (parseFloat(line.quantity) || 0), 0);
+                return (
                 <tr key={po.id} data-testid={`lpo-row-${po.id}`}>
                   <td className="font-mono font-medium">{po.order_number}</td>
                   <td>{formatDate(po.order_date)}</td>
                   <td className="font-medium">{po.supplier_name}</td>
+                  <td className="text-right font-mono">{totalQty.toFixed(3)}</td>
                   <td className="text-right font-mono">{formatCurrency(po.subtotal)}</td>
                   <td className="text-right font-mono">{formatCurrency(po.vat_amount)}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(po.total_amount)}</td>
@@ -220,7 +225,8 @@ export default function LocalPurchasesPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
