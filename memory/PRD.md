@@ -144,6 +144,20 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Gain: Dr Bank Account, Cr Foreign Exchange Gain (4220)
   - Loss: Dr Foreign Exchange Loss (6950), Cr Bank Account
 
+### Feature ✅ - Account Ledgers (Cash, Petty Cash, Bank)
+- **Added three new ledger reports** in Accounting module:
+  - **Cash Ledger** (`/accounting/ledger/cash`) - Account 1110
+  - **Petty Cash Ledger** (`/accounting/ledger/petty-cash`) - Account 1130
+  - **Bank Ledger** (`/accounting/ledger/bank`) - Account 1120
+- **Features:**
+  - Date range filter (From/To)
+  - Opening Balance calculation (sum of all prior transactions)
+  - Transaction list with running balance
+  - Summary KPIs: Opening Balance, Total Debits (In), Total Credits (Out), Closing Balance
+  - Print ledger report with company branding
+  - Source badge showing transaction origin (auto_payment, manual_exchange, etc.)
+- **API:** `GET /api/accounting/ledger/{account_code}`
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix
@@ -288,6 +302,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] **Print Vouchers** - Print functionality for Expense and Income vouchers
 - [x] **Payment Exchange Gain/Loss** - Manual exchange gain/loss feature in Payments module (April 8, 2026)
 - [x] **Exchange Gain/Loss Module** - Standalone page for manual currency revaluation entries (April 8, 2026)
+- [x] **Account Ledgers** - Cash, Petty Cash, and Bank ledger reports with running balance (April 8, 2026)
 
 ### P0 - In Progress
 - [ ] **Fix Expense Category Dropdown** - Newly added expense categories not showing in dropdown

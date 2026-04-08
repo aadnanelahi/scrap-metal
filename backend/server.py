@@ -4497,6 +4497,97 @@ async def update_account_settings(data: Dict, current_user: Dict = Depends(get_c
     await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'account_settings', company_id)
     return {"message": "Settings updated"}
 
+# ==================== ACCOUNT LEDGER API ====================
+@api_router.get("/accounting/ledger/{account_code}")
+async def get_account_ledger(
+    account_code: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """Get ledger transactions for a specific account by code"""
+    company_id = await get_user_company_id(current_user)
+    
+    # Get the account
+    account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": account_code, "is_active": True},
+        {"_id": 0}
+    )
+    
+    if not account:
+        raise HTTPException(status_code=404, detail=f"Account {account_code} not found")
+    
+    # Default dates
+    if not start_date:
+        start_date = datetime.now(timezone.utc).replace(day=1).strftime("%Y-%m-%d")
+    if not end_date:
+        end_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Calculate opening balance (sum of all transactions before start_date)
+    opening_pipeline = [
+        {"$match": {"company_id": company_id, "entry_date": {"$lt": start_date}}},
+        {"$unwind": "$lines"},
+        {"$match": {"lines.account_code": account_code}},
+        {"$group": {
+            "_id": None,
+            "total_debit": {"$sum": {"$ifNull": ["$lines.debit_amount", 0]}},
+            "total_credit": {"$sum": {"$ifNull": ["$lines.credit_amount", 0]}}
+        }}
+    ]
+    
+    opening_result = await db.accounting_journal_entries.aggregate(opening_pipeline).to_list(1)
+    
+    if opening_result:
+        opening_debit = opening_result[0].get('total_debit', 0)
+        opening_credit = opening_result[0].get('total_credit', 0)
+        # For asset accounts (debit normal balance): opening = debit - credit
+        # For liability accounts (credit normal balance): opening = credit - debit
+        if account.get('normal_balance') == 'debit':
+            opening_balance = opening_debit - opening_credit
+        else:
+            opening_balance = opening_credit - opening_debit
+    else:
+        opening_balance = 0
+    
+    # Get transactions within the date range
+    transactions_pipeline = [
+        {"$match": {
+            "company_id": company_id, 
+            "entry_date": {"$gte": start_date, "$lte": end_date}
+        }},
+        {"$unwind": "$lines"},
+        {"$match": {"lines.account_code": account_code}},
+        {"$project": {
+            "_id": 0,
+            "id": "$id",
+            "entry_number": "$entry_number",
+            "entry_date": "$entry_date",
+            "reference_type": "$reference_type",
+            "reference_number": "$reference_number",
+            "source": "$source",
+            "description": "$lines.description",
+            "debit_amount": "$lines.debit_amount",
+            "credit_amount": "$lines.credit_amount"
+        }},
+        {"$sort": {"entry_date": 1, "entry_number": 1}}
+    ]
+    
+    transactions = await db.accounting_journal_entries.aggregate(transactions_pipeline).to_list(1000)
+    
+    return {
+        "account": {
+            "id": account.get('id'),
+            "account_code": account.get('account_code'),
+            "account_name": account.get('account_name'),
+            "account_type": account.get('account_type'),
+            "normal_balance": account.get('normal_balance')
+        },
+        "start_date": start_date,
+        "end_date": end_date,
+        "opening_balance": round(opening_balance, 2),
+        "transactions": transactions
+    }
+
 # Financial Reports API
 @api_router.get("/accounting/reports/trial-balance")
 async def get_accounting_trial_balance(

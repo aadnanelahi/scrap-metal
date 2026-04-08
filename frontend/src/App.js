@@ -56,6 +56,7 @@ import BalanceSheetPage from './pages/accounting/BalanceSheetPage';
 import ReceivablesPage from './pages/accounting/ReceivablesPage';
 import PayablesPage from './pages/accounting/PayablesPage';
 import AccountingSettingsPage from './pages/accounting/AccountingSettingsPage';
+import CashLedgerPage, { PettyCashLedgerPage, BankLedgerPage } from './pages/accounting/LedgerPage';
 
 // Reports
 import PurchaseRegisterPage from './pages/reports/PurchaseRegisterPage';
@@ -163,6 +164,9 @@ function AppRoutes() {
       <Route path="/accounting/reports/balance-sheet" element={<ProtectedRoute><BalanceSheetPage /></ProtectedRoute>} />
       <Route path="/accounting/reports/receivables" element={<ProtectedRoute><ReceivablesPage /></ProtectedRoute>} />
       <Route path="/accounting/reports/payables" element={<ProtectedRoute><PayablesPage /></ProtectedRoute>} />
+      <Route path="/accounting/ledger/cash" element={<ProtectedRoute><CashLedgerPage /></ProtectedRoute>} />
+      <Route path="/accounting/ledger/petty-cash" element={<ProtectedRoute><PettyCashLedgerPage /></ProtectedRoute>} />
+      <Route path="/accounting/ledger/bank" element={<ProtectedRoute><BankLedgerPage /></ProtectedRoute>} />
       <Route path="/accounting/settings" element={<ProtectedRoute><AccountingSettingsPage /></ProtectedRoute>} />
 
       {/* Reports */}

@@ -305,6 +305,10 @@ export const accountingReportsAPI = {
   payables: (params) => api.get('/accounting/reports/payables', { params }),
 };
 
+export const accountingAPI = {
+  getLedger: (accountCode, params) => api.get(`/accounting/ledger/${accountCode}`, { params }),
+};
+
 // Seed Data
 export const seedDataAPI = {
   seed: () => api.post('/seed-data'),
