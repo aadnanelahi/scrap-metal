@@ -3104,6 +3104,197 @@ async def post_payment(payment_id: str, current_user: Dict = Depends(get_current
     await log_audit(current_user['id'], current_user['email'], 'POST', 'payment', payment_id)
     return {"message": "Payment posted", "journal_entry_id": je_id}
 
+# ==================== EXCHANGE GAIN/LOSS ====================
+@api_router.get("/exchange-gain-loss")
+async def list_exchange_gain_loss(
+    entry_type: Optional[str] = None,
+    current_user: Dict = Depends(get_current_user)
+):
+    """List manual exchange gain/loss entries"""
+    company_id = await get_user_company_id(current_user)
+    filters = {"company_id": company_id, "is_active": True}
+    if entry_type:
+        filters['entry_type'] = entry_type
+    
+    entries = await db.exchange_gain_loss.find(filters, {"_id": 0}).sort("entry_date", -1).to_list(500)
+    return entries
+
+@api_router.get("/exchange-gain-loss/{entry_id}")
+async def get_exchange_gain_loss(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    """Get single exchange gain/loss entry"""
+    company_id = await get_user_company_id(current_user)
+    entry = await db.exchange_gain_loss.find_one(
+        {"id": entry_id, "company_id": company_id}, {"_id": 0}
+    )
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return entry
+
+@api_router.post("/exchange-gain-loss")
+async def create_exchange_gain_loss(data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Create manual exchange gain/loss entry"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    entry_id = str(uuid.uuid4())
+    entry_type = data.get('entry_type', 'gain')
+    prefix = "EXG" if entry_type == 'gain' else "EXL"
+    entry_number = await generate_entry_number(company_id, prefix, "exchange_gain_loss")
+    
+    entry = {
+        "id": entry_id,
+        "company_id": company_id,
+        "entry_number": entry_number,
+        "entry_type": entry_type,
+        "entry_date": data.get('entry_date'),
+        "currency": data.get('currency', 'USD'),
+        "original_amount": float(data.get('original_amount', 0)),
+        "original_rate": float(data.get('original_rate', 1)),
+        "current_rate": float(data.get('current_rate', 1)),
+        "calculated_amount": float(data.get('calculated_amount', 0)),
+        "reference_number": data.get('reference_number'),
+        "description": data.get('description'),
+        "notes": data.get('notes'),
+        "status": "draft",
+        "is_active": True,
+        "created_by": current_user['id'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.exchange_gain_loss.insert_one(entry)
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'exchange_gain_loss', entry_id)
+    return {k: v for k, v in entry.items() if k != '_id'}
+
+@api_router.post("/exchange-gain-loss/{entry_id}/post")
+async def post_exchange_gain_loss(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    """Post exchange gain/loss entry to journal"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    entry = await db.exchange_gain_loss.find_one({"id": entry_id, "company_id": company_id}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    if entry.get('status') == 'posted':
+        raise HTTPException(status_code=400, detail="Already posted")
+    
+    # Get exchange gain/loss accounts from COA
+    exchange_gain_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "4220", "is_active": True}, {"_id": 0}
+    )
+    exchange_loss_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "6950", "is_active": True}, {"_id": 0}
+    )
+    
+    # Get a bank or receivable account for the offset
+    # For gains: Dr Receivable/Bank, Cr Exchange Gain
+    # For losses: Dr Exchange Loss, Cr Payable/Bank
+    bank_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1120", "is_active": True}, {"_id": 0}
+    )
+    
+    if not exchange_gain_account or not exchange_loss_account:
+        raise HTTPException(status_code=400, detail="Exchange gain/loss accounts not found in Chart of Accounts")
+    
+    calculated_amount = float(entry.get('calculated_amount', 0))
+    lines = []
+    
+    if entry.get('entry_type') == 'gain':
+        # Dr Bank/Receivable (or other asset), Cr Exchange Gain
+        lines = [
+            {
+                "account_id": bank_account['id'] if bank_account else exchange_gain_account['id'],
+                "account_code": "1120" if bank_account else "4220",
+                "account_name": "Bank Account" if bank_account else "Foreign Exchange Gain",
+                "debit_amount": calculated_amount,
+                "credit_amount": 0,
+                "description": f"Exchange gain adjustment - {entry.get('description', '')}"
+            },
+            {
+                "account_id": exchange_gain_account['id'],
+                "account_code": "4220",
+                "account_name": "Foreign Exchange Gain",
+                "debit_amount": 0,
+                "credit_amount": calculated_amount,
+                "description": f"Exchange gain - {entry.get('currency')} revaluation"
+            }
+        ]
+    else:
+        # Dr Exchange Loss, Cr Bank/Payable
+        lines = [
+            {
+                "account_id": exchange_loss_account['id'],
+                "account_code": "6950",
+                "account_name": "Foreign Exchange Loss",
+                "debit_amount": calculated_amount,
+                "credit_amount": 0,
+                "description": f"Exchange loss - {entry.get('currency')} revaluation"
+            },
+            {
+                "account_id": bank_account['id'] if bank_account else exchange_loss_account['id'],
+                "account_code": "1120" if bank_account else "6950",
+                "account_name": "Bank Account" if bank_account else "Foreign Exchange Loss",
+                "debit_amount": 0,
+                "credit_amount": calculated_amount,
+                "description": f"Exchange loss adjustment - {entry.get('description', '')}"
+            }
+        ]
+    
+    # Create journal entry
+    je_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    je_id = str(uuid.uuid4())
+    
+    je = {
+        "id": je_id,
+        "company_id": company_id,
+        "entry_number": je_number,
+        "entry_date": entry['entry_date'],
+        "reference_type": "exchange_gain_loss",
+        "reference_id": entry_id,
+        "reference_number": entry.get('entry_number'),
+        "description": f"Exchange {entry.get('entry_type')} - {entry.get('description', '')}",
+        "source": "manual_exchange",
+        "lines": lines,
+        "total_debit": calculated_amount,
+        "total_credit": calculated_amount,
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['id'],
+        "created_by": current_user['id'],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.accounting_journal_entries.insert_one(je)
+    
+    # Update entry status
+    await db.exchange_gain_loss.update_one(
+        {"id": entry_id},
+        {"$set": {
+            "status": "posted",
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "journal_entry_id": je_id
+        }}
+    )
+    
+    await log_audit(current_user['id'], current_user['email'], 'POST', 'exchange_gain_loss', entry_id)
+    return {"message": "Entry posted", "journal_entry_id": je_id}
+
+@api_router.delete("/exchange-gain-loss/{entry_id}")
+async def delete_exchange_gain_loss(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    """Delete exchange gain/loss entry (only if not posted)"""
+    require_finance_role(current_user)
+    company_id = await get_user_company_id(current_user)
+    
+    entry = await db.exchange_gain_loss.find_one({"id": entry_id, "company_id": company_id}, {"_id": 0})
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+    
+    if entry.get('status') == 'posted':
+        raise HTTPException(status_code=400, detail="Cannot delete posted entry")
+    
+    await db.exchange_gain_loss.delete_one({"id": entry_id})
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'exchange_gain_loss', entry_id)
+    return {"message": "Entry deleted"}
+
 # ==================== DOCUMENT CANCELLATION ====================
 @api_router.post("/local-purchases/{po_id}/cancel")
 async def cancel_local_purchase(po_id: str, reason: str = Query(...), current_user: Dict = Depends(get_current_user)):

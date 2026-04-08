@@ -93,6 +93,7 @@ const navItems = [
       { title: 'Chart of Accounts', path: '/accounts' },
       { title: 'Journal Entries', path: '/journal-entries' },
       { title: 'Payments', path: '/payments' },
+      { title: 'Exchange Gain/Loss', path: '/exchange-gain-loss' },
     ],
   },
   {

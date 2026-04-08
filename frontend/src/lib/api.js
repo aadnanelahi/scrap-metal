@@ -232,6 +232,15 @@ export const paymentsAPI = {
   post: (id) => api.post(`/payments/${id}/post`),
 };
 
+// Exchange Gain/Loss
+export const exchangeGainLossAPI = {
+  list: (params) => api.get('/exchange-gain-loss', { params }),
+  get: (id) => api.get(`/exchange-gain-loss/${id}`),
+  create: (data) => api.post('/exchange-gain-loss', data),
+  post: (id) => api.post(`/exchange-gain-loss/${id}/post`),
+  delete: (id) => api.delete(`/exchange-gain-loss/${id}`),
+};
+
 // Audit Logs
 export const auditLogsAPI = {
   list: (params) => api.get('/audit-logs', { params }),

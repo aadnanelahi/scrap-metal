@@ -128,6 +128,22 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - **Payments table** now shows "Exchange Diff" column with gain/loss indicator icons
 - Backend creates proper balanced journal entries in `accounting_journal_entries`
 
+### Feature ✅ - Standalone Exchange Gain/Loss Module (NEW)
+- **Added dedicated Exchange Gain/Loss page** at `/exchange-gain-loss`
+- Accessible from Finance → Exchange Gain/Loss in sidebar
+- **Features:**
+  - Create manual exchange gain/loss entries for currency revaluation
+  - Support for any foreign currency (USD, EUR, etc.)
+  - Entry types: Gain (EXG-) or Loss (EXL-)
+  - Real-time calculation of gain/loss amount
+  - Post to accounting journal with proper double-entry
+  - Print exchange vouchers with company branding
+  - Delete draft entries
+- **Summary KPIs:** Total Gains, Total Losses, Net Position
+- **Journal Entries:**
+  - Gain: Dr Bank Account, Cr Foreign Exchange Gain (4220)
+  - Loss: Dr Foreign Exchange Loss (6950), Cr Bank Account
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix
@@ -271,6 +287,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] **Accounting Module Phase 3** - Accounting Settings page (fiscal year, default accounts, period lock)
 - [x] **Print Vouchers** - Print functionality for Expense and Income vouchers
 - [x] **Payment Exchange Gain/Loss** - Manual exchange gain/loss feature in Payments module (April 8, 2026)
+- [x] **Exchange Gain/Loss Module** - Standalone page for manual currency revaluation entries (April 8, 2026)
 
 ### P0 - In Progress
 - [ ] **Fix Expense Category Dropdown** - Newly added expense categories not showing in dropdown

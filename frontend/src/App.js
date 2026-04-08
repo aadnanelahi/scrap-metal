@@ -44,6 +44,7 @@ import WeighbridgesMasterPage from './pages/master/WeighbridgesMasterPage';
 import AccountsPage from './pages/finance/AccountsPage';
 import JournalEntriesPage from './pages/finance/JournalEntriesPage';
 import PaymentsPage from './pages/finance/PaymentsPage';
+import ExchangeGainLossPage from './pages/finance/ExchangeGainLossPage';
 
 // Accounting Module (New)
 import ChartOfAccountsPage from './pages/accounting/ChartOfAccountsPage';
@@ -151,6 +152,7 @@ function AppRoutes() {
       <Route path="/accounts" element={<ProtectedRoute><AccountsPage /></ProtectedRoute>} />
       <Route path="/journal-entries" element={<ProtectedRoute><JournalEntriesPage /></ProtectedRoute>} />
       <Route path="/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
+      <Route path="/exchange-gain-loss" element={<ProtectedRoute><ExchangeGainLossPage /></ProtectedRoute>} />
 
       {/* Accounting Module (New) */}
       <Route path="/accounting/chart-of-accounts" element={<ProtectedRoute><ChartOfAccountsPage /></ProtectedRoute>} />
