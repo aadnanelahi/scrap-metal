@@ -111,6 +111,23 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 ### ✅ Custom Branding
 - TechSight Innovation branding on login page and sidebar
 
+## Recent Changes (April 8, 2026)
+
+### Feature ✅ - Manual Currency Exchange Gain/Loss in Payments
+- **Added exchange gain/loss feature to Payments module**
+- When recording payments against foreign currency invoices, users can now:
+  - Check "Foreign Currency Payment (Exchange Gain/Loss)" checkbox
+  - Enter original invoice currency (USD, EUR, etc.)
+  - Enter original invoice amount
+  - Enter invoice exchange rate (rate at invoice date)
+  - Enter payment exchange rate (today's rate)
+- **Automatic calculation** of exchange difference
+- **Journal entry creation**:
+  - Exchange Gain: Credited to account 4220 (Foreign Exchange Gain)
+  - Exchange Loss: Debited to account 6950 (Foreign Exchange Loss)
+- **Payments table** now shows "Exchange Diff" column with gain/loss indicator icons
+- Backend creates proper balanced journal entries in `accounting_journal_entries`
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix
@@ -253,8 +270,10 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] **Currency Conversion Bug Fix** - All financial reports now correctly convert foreign currency to AED
 - [x] **Accounting Module Phase 3** - Accounting Settings page (fiscal year, default accounts, period lock)
 - [x] **Print Vouchers** - Print functionality for Expense and Income vouchers
+- [x] **Payment Exchange Gain/Loss** - Manual exchange gain/loss feature in Payments module (April 8, 2026)
 
 ### P0 - In Progress
+- [ ] **Fix Expense Category Dropdown** - Newly added expense categories not showing in dropdown
 - [ ] **Accounting Module Phase 4** - Role-based permissions for finance operations
 - [ ] **Accounting Module Phase 5** - Data migration script for existing companies
 

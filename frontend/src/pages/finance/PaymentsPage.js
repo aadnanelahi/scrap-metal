@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { paymentsAPI, customersAPI, suppliersAPI, companiesAPI } from '../../lib/api';
+import { paymentsAPI, customersAPI, suppliersAPI, companiesAPI, currenciesAPI } from '../../lib/api';
 import { formatCurrency, formatDate, toISODateString, getStatusColor, printDocument, generatePaymentReceiptHTML } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -9,12 +9,13 @@ import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users } from 'lucide-react';
+import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
+  const [currencies, setCurrencies] = useState([]);
   const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
@@ -31,7 +32,13 @@ export default function PaymentsPage() {
     payment_method: 'cash',
     reference_number: '',
     document_number: '',
-    notes: ''
+    notes: '',
+    // Exchange gain/loss fields
+    original_currency: 'AED',
+    original_amount: 0,
+    original_exchange_rate: 1,
+    payment_exchange_rate: 1,
+    has_exchange_difference: false
   });
 
   useEffect(() => {
@@ -40,15 +47,17 @@ export default function PaymentsPage() {
 
   const loadData = async () => {
     try {
-      const [paymentsRes, custRes, suppRes, companiesRes] = await Promise.all([
+      const [paymentsRes, custRes, suppRes, companiesRes, currenciesRes] = await Promise.all([
         paymentsAPI.list(),
         customersAPI.list(),
         suppliersAPI.list(),
-        companiesAPI.list()
+        companiesAPI.list(),
+        currenciesAPI.list()
       ]);
       setPayments(paymentsRes.data || []);
       setCustomers(custRes.data || []);
       setSuppliers(suppRes.data || []);
+      setCurrencies(currenciesRes.data || []);
       const companies = companiesRes.data || [];
       setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
@@ -125,9 +134,55 @@ export default function PaymentsPage() {
       payment_method: 'cash',
       reference_number: '',
       document_number: '',
-      notes: ''
+      notes: '',
+      original_currency: 'AED',
+      original_amount: 0,
+      original_exchange_rate: 1,
+      payment_exchange_rate: 1,
+      has_exchange_difference: false
     });
   };
+
+  // Calculate exchange difference
+  const calculateExchangeDifference = () => {
+    if (!formData.has_exchange_difference || formData.original_currency === 'AED') {
+      return { amount: 0, type: null };
+    }
+    
+    // Original invoice amount in AED (at time of invoice)
+    const originalAed = formData.original_amount * formData.original_exchange_rate;
+    // Payment amount in AED (at time of payment)
+    const paymentAed = formData.original_amount * formData.payment_exchange_rate;
+    
+    const difference = paymentAed - originalAed;
+    
+    if (Math.abs(difference) < 0.01) {
+      return { amount: 0, type: null };
+    }
+    
+    // For Receipts (from customer): 
+    //   - Customer pays MORE AED than originally recorded = Exchange GAIN (positive)
+    //   - Customer pays LESS AED than originally recorded = Exchange LOSS (negative)
+    // For Payments (to supplier):
+    //   - We pay LESS AED than originally recorded = Exchange GAIN
+    //   - We pay MORE AED than originally recorded = Exchange LOSS
+    
+    if (formData.type === 'received') {
+      // Receipt from customer
+      return {
+        amount: Math.abs(difference),
+        type: difference > 0 ? 'gain' : 'loss'
+      };
+    } else {
+      // Payment to supplier (reversed logic)
+      return {
+        amount: Math.abs(difference),
+        type: difference < 0 ? 'gain' : 'loss'
+      };
+    }
+  };
+
+  const exchangeDiff = calculateExchangeDifference();
 
   const partyList = formData.party_type === 'customer' ? customers : suppliers;
 
@@ -247,6 +302,115 @@ export default function PaymentsPage() {
                     placeholder="Invoice/PO Number"
                   />
                 </div>
+                
+                {/* Exchange Gain/Loss Section */}
+                <div className="col-span-2 border-t pt-4 mt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <input
+                      type="checkbox"
+                      id="has_exchange_difference"
+                      checked={formData.has_exchange_difference}
+                      onChange={(e) => setFormData({ ...formData, has_exchange_difference: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-300"
+                      data-testid="exchange-diff-checkbox"
+                    />
+                    <Label htmlFor="has_exchange_difference" className="flex items-center gap-2 cursor-pointer">
+                      <ArrowRightLeft className="w-4 h-4 text-amber-500" />
+                      Foreign Currency Payment (Exchange Gain/Loss)
+                    </Label>
+                  </div>
+                  
+                  {formData.has_exchange_difference && (
+                    <div className="space-y-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="form-label">Original Currency</Label>
+                          <Select 
+                            value={formData.original_currency} 
+                            onValueChange={(v) => setFormData({ ...formData, original_currency: v })}
+                          >
+                            <SelectTrigger className="form-input" data-testid="original-currency-select">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AED">AED - UAE Dirham</SelectItem>
+                              {currencies.filter(c => c.code !== 'AED').map((c) => (
+                                <SelectItem key={c.code} value={c.code}>{c.code} - {c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="form-label">Invoice Amount ({formData.original_currency})</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.original_amount}
+                            onChange={(e) => setFormData({ ...formData, original_amount: parseFloat(e.target.value) || 0 })}
+                            className="form-input"
+                            data-testid="original-amount-input"
+                          />
+                        </div>
+                        <div>
+                          <Label className="form-label">Invoice Exchange Rate</Label>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            value={formData.original_exchange_rate}
+                            onChange={(e) => setFormData({ ...formData, original_exchange_rate: parseFloat(e.target.value) || 1 })}
+                            className="form-input"
+                            placeholder="Rate at invoice date"
+                            data-testid="original-rate-input"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            = {formatCurrency(formData.original_amount * formData.original_exchange_rate)} at invoice
+                          </p>
+                        </div>
+                        <div>
+                          <Label className="form-label">Payment Exchange Rate</Label>
+                          <Input
+                            type="number"
+                            step="0.0001"
+                            value={formData.payment_exchange_rate}
+                            onChange={(e) => setFormData({ ...formData, payment_exchange_rate: parseFloat(e.target.value) || 1 })}
+                            className="form-input"
+                            placeholder="Today's rate"
+                            data-testid="payment-rate-input"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            = {formatCurrency(formData.original_amount * formData.payment_exchange_rate)} at payment
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Exchange Difference Display */}
+                      {exchangeDiff.type && (
+                        <div className={`flex items-center justify-between p-3 rounded-lg ${
+                          exchangeDiff.type === 'gain' 
+                            ? 'bg-emerald-100 dark:bg-emerald-900/30 border border-emerald-300' 
+                            : 'bg-red-100 dark:bg-red-900/30 border border-red-300'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {exchangeDiff.type === 'gain' ? (
+                              <TrendingUp className="w-5 h-5 text-emerald-600" />
+                            ) : (
+                              <TrendingDown className="w-5 h-5 text-red-600" />
+                            )}
+                            <span className="font-medium">
+                              Exchange {exchangeDiff.type === 'gain' ? 'Gain' : 'Loss'}
+                            </span>
+                          </div>
+                          <span className={`font-mono font-bold ${
+                            exchangeDiff.type === 'gain' ? 'text-emerald-700' : 'text-red-700'
+                          }`}>
+                            {formatCurrency(exchangeDiff.amount)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="col-span-2">
                   <Label className="form-label">Notes</Label>
                   <Textarea
@@ -302,6 +466,7 @@ export default function PaymentsPage() {
               <th>Party</th>
               <th>Method</th>
               <th className="text-right">Amount</th>
+              <th>Exchange Diff</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -309,7 +474,7 @@ export default function PaymentsPage() {
           <tbody>
             {payments.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-slate-400">
+                <td colSpan={9} className="text-center py-12 text-slate-400">
                   <Wallet className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>No payments yet</p>
                 </td>
@@ -327,6 +492,24 @@ export default function PaymentsPage() {
                   <td className="font-medium">{payment.party_name}</td>
                   <td className="capitalize">{payment.payment_method?.replace('_', ' ')}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(payment.amount, payment.currency)}</td>
+                  <td className="text-center">
+                    {payment.exchange_difference_type ? (
+                      <div className="flex items-center justify-center gap-1">
+                        {payment.exchange_difference_type === 'gain' ? (
+                          <TrendingUp className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-red-500" />
+                        )}
+                        <span className={`font-mono text-sm ${
+                          payment.exchange_difference_type === 'gain' ? 'text-emerald-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(payment.exchange_difference_amount || 0)}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </td>
                   <td>
                     <Badge className={`${getStatusColor(payment.status)} border rounded-full text-xs`}>
                       {payment.status}

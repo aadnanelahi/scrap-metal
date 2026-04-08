@@ -2827,6 +2827,31 @@ async def create_payment(data: Dict, current_user: Dict = Depends(get_current_us
     receipt_type = "RV" if data.get('type') == 'received' else "PV"
     receipt_number = await generate_number(receipt_type, "payments")
     
+    # Calculate exchange difference if applicable
+    exchange_difference_amount = 0
+    exchange_difference_type = None
+    
+    if data.get('has_exchange_difference') and data.get('original_currency') != 'AED':
+        original_amount = float(data.get('original_amount', 0))
+        original_rate = float(data.get('original_exchange_rate', 1))
+        payment_rate = float(data.get('payment_exchange_rate', 1))
+        
+        # Original invoice amount in AED
+        original_aed = original_amount * original_rate
+        # Payment amount in AED  
+        payment_aed = original_amount * payment_rate
+        
+        difference = payment_aed - original_aed
+        
+        if abs(difference) >= 0.01:
+            exchange_difference_amount = abs(difference)
+            # For receipts: positive diff = gain, negative = loss
+            # For payments: reversed - positive diff = loss, negative = gain
+            if data.get('type') == 'received':
+                exchange_difference_type = 'gain' if difference > 0 else 'loss'
+            else:
+                exchange_difference_type = 'gain' if difference < 0 else 'loss'
+    
     payment = {
         "id": payment_id,
         "receipt_number": receipt_number,
@@ -2841,6 +2866,14 @@ async def create_payment(data: Dict, current_user: Dict = Depends(get_current_us
         "reference_number": data.get('reference_number'),
         "document_number": data.get('document_number'),
         "notes": data.get('notes'),
+        # Exchange gain/loss fields
+        "has_exchange_difference": data.get('has_exchange_difference', False),
+        "original_currency": data.get('original_currency', 'AED'),
+        "original_amount": data.get('original_amount', 0),
+        "original_exchange_rate": data.get('original_exchange_rate', 1),
+        "payment_exchange_rate": data.get('payment_exchange_rate', 1),
+        "exchange_difference_amount": exchange_difference_amount,
+        "exchange_difference_type": exchange_difference_type,
         "status": "draft",
         "is_active": True,
         "created_by": current_user['id'],
@@ -2860,45 +2893,216 @@ async def post_payment(payment_id: str, current_user: Dict = Depends(get_current
     if payment.get('status') == 'posted':
         raise HTTPException(status_code=400, detail="Already posted")
     
-    # Create journal entry for payment
-    je_id = str(uuid.uuid4())
-    je_number = await generate_number("JE", "journal_entries")
+    company_id = await get_user_company_id(current_user)
+    
+    # Get company settings for default accounts
+    settings = await db.account_settings.find_one({"company_id": company_id}, {"_id": 0})
+    
+    # Get account IDs from COA
+    cash_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1110", "is_active": True}, {"_id": 0}
+    )
+    receivable_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "1200", "is_active": True}, {"_id": 0}
+    )
+    payable_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "2110", "is_active": True}, {"_id": 0}
+    )
+    exchange_gain_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "4220", "is_active": True}, {"_id": 0}
+    )
+    exchange_loss_account = await db.chart_of_accounts.find_one(
+        {"company_id": company_id, "account_code": "6950", "is_active": True}, {"_id": 0}
+    )
+    
+    # Use settings default or fallback to hardcoded
+    cash_id = settings.get('default_cash_account_id') if settings else None
+    receivable_id = settings.get('default_receivable_account_id') if settings else None
+    payable_id = settings.get('default_payable_account_id') if settings else None
+    
+    if not cash_id and cash_account:
+        cash_id = cash_account['id']
+    if not receivable_id and receivable_account:
+        receivable_id = receivable_account['id']
+    if not payable_id and payable_account:
+        payable_id = payable_account['id']
+    
+    exchange_gain_id = exchange_gain_account['id'] if exchange_gain_account else None
+    exchange_loss_id = exchange_loss_account['id'] if exchange_loss_account else None
+    
+    # Build journal entry lines
+    lines = []
+    amount = float(payment.get('amount', 0))
+    exchange_diff_amount = float(payment.get('exchange_difference_amount', 0))
+    exchange_diff_type = payment.get('exchange_difference_type')
     
     if payment.get('type') == 'received':
         # Received from customer: Dr Cash, Cr Accounts Receivable
-        entries = [
-            {"account_code": "1000", "account_name": "Cash", "debit": payment['amount'], "credit": 0},
-            {"account_code": "1100", "account_name": "Accounts Receivable", "debit": 0, "credit": payment['amount']}
-        ]
+        # If exchange gain: Cr Exchange Gain
+        # If exchange loss: Dr Exchange Loss
+        
+        cash_debit = amount
+        receivable_credit = amount
+        
+        lines.append({
+            "account_id": cash_id,
+            "account_code": "1110",
+            "account_name": "Cash on Hand",
+            "debit_amount": cash_debit,
+            "credit_amount": 0,
+            "description": f"Cash received from {payment.get('party_name', 'Customer')}"
+        })
+        
+        # Handle exchange difference for receivables credit
+        if exchange_diff_type == 'gain' and exchange_diff_amount > 0:
+            # We received more than booked - credit Exchange Gain
+            lines.append({
+                "account_id": receivable_id,
+                "account_code": "1200", 
+                "account_name": "Accounts Receivable",
+                "debit_amount": 0,
+                "credit_amount": receivable_credit - exchange_diff_amount,
+                "description": f"Receivable cleared for {payment.get('party_name', 'Customer')}"
+            })
+            lines.append({
+                "account_id": exchange_gain_id,
+                "account_code": "4220",
+                "account_name": "Foreign Exchange Gain",
+                "debit_amount": 0,
+                "credit_amount": exchange_diff_amount,
+                "description": f"Exchange gain on receipt from {payment.get('party_name', 'Customer')}"
+            })
+        elif exchange_diff_type == 'loss' and exchange_diff_amount > 0:
+            # We received less than booked - debit Exchange Loss
+            lines.append({
+                "account_id": receivable_id,
+                "account_code": "1200",
+                "account_name": "Accounts Receivable", 
+                "debit_amount": 0,
+                "credit_amount": receivable_credit + exchange_diff_amount,
+                "description": f"Receivable cleared for {payment.get('party_name', 'Customer')}"
+            })
+            lines.append({
+                "account_id": exchange_loss_id,
+                "account_code": "6950",
+                "account_name": "Foreign Exchange Loss",
+                "debit_amount": exchange_diff_amount,
+                "credit_amount": 0,
+                "description": f"Exchange loss on receipt from {payment.get('party_name', 'Customer')}"
+            })
+        else:
+            lines.append({
+                "account_id": receivable_id,
+                "account_code": "1200",
+                "account_name": "Accounts Receivable",
+                "debit_amount": 0,
+                "credit_amount": receivable_credit,
+                "description": f"Receivable cleared for {payment.get('party_name', 'Customer')}"
+            })
     else:
         # Paid to supplier: Dr Accounts Payable, Cr Cash
-        entries = [
-            {"account_code": "2000", "account_name": "Accounts Payable", "debit": payment['amount'], "credit": 0},
-            {"account_code": "1000", "account_name": "Cash", "debit": 0, "credit": payment['amount']}
-        ]
+        # If exchange gain (paid less): Cr Exchange Gain
+        # If exchange loss (paid more): Dr Exchange Loss
+        
+        payable_debit = amount
+        cash_credit = amount
+        
+        # Handle exchange difference for payables debit
+        if exchange_diff_type == 'gain' and exchange_diff_amount > 0:
+            # We paid less than booked - credit Exchange Gain
+            lines.append({
+                "account_id": payable_id,
+                "account_code": "2110",
+                "account_name": "Accounts Payable",
+                "debit_amount": payable_debit + exchange_diff_amount,
+                "credit_amount": 0,
+                "description": f"Payable cleared for {payment.get('party_name', 'Supplier')}"
+            })
+            lines.append({
+                "account_id": exchange_gain_id,
+                "account_code": "4220",
+                "account_name": "Foreign Exchange Gain",
+                "debit_amount": 0,
+                "credit_amount": exchange_diff_amount,
+                "description": f"Exchange gain on payment to {payment.get('party_name', 'Supplier')}"
+            })
+        elif exchange_diff_type == 'loss' and exchange_diff_amount > 0:
+            # We paid more than booked - debit Exchange Loss
+            lines.append({
+                "account_id": payable_id,
+                "account_code": "2110",
+                "account_name": "Accounts Payable",
+                "debit_amount": payable_debit - exchange_diff_amount,
+                "credit_amount": 0,
+                "description": f"Payable cleared for {payment.get('party_name', 'Supplier')}"
+            })
+            lines.append({
+                "account_id": exchange_loss_id,
+                "account_code": "6950",
+                "account_name": "Foreign Exchange Loss",
+                "debit_amount": exchange_diff_amount,
+                "credit_amount": 0,
+                "description": f"Exchange loss on payment to {payment.get('party_name', 'Supplier')}"
+            })
+        else:
+            lines.append({
+                "account_id": payable_id,
+                "account_code": "2110",
+                "account_name": "Accounts Payable",
+                "debit_amount": payable_debit,
+                "credit_amount": 0,
+                "description": f"Payable cleared for {payment.get('party_name', 'Supplier')}"
+            })
+        
+        lines.append({
+            "account_id": cash_id,
+            "account_code": "1110",
+            "account_name": "Cash on Hand",
+            "debit_amount": 0,
+            "credit_amount": cash_credit,
+            "description": f"Cash paid to {payment.get('party_name', 'Supplier')}"
+        })
+    
+    # Calculate totals
+    total_debit = sum(line.get('debit_amount', 0) for line in lines)
+    total_credit = sum(line.get('credit_amount', 0) for line in lines)
+    
+    # Create accounting journal entry
+    entry_number = await generate_entry_number(company_id, "JE", "accounting_journal_entries")
+    je_id = str(uuid.uuid4())
     
     je = {
         "id": je_id,
-        "entry_number": je_number,
+        "company_id": company_id,
+        "entry_number": entry_number,
         "entry_date": payment['payment_date'],
         "reference_type": "payment",
         "reference_id": payment_id,
+        "reference_number": payment.get('receipt_number'),
         "description": f"Payment {'received from' if payment['type'] == 'received' else 'made to'} {payment.get('party_name', 'N/A')}",
-        "entries": entries,
-        "total_debit": payment['amount'],
-        "total_credit": payment['amount'],
+        "source": "auto_payment",
+        "lines": lines,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
+        "is_posted": True,
+        "posted_at": datetime.now(timezone.utc).isoformat(),
+        "posted_by": current_user['id'],
         "created_by": current_user['id'],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.journal_entries.insert_one(je)
+    await db.accounting_journal_entries.insert_one(je)
     
     await db.payments.update_one(
         {"id": payment_id},
-        {"$set": {"status": "posted", "posted_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {
+            "status": "posted", 
+            "posted_at": datetime.now(timezone.utc).isoformat(),
+            "journal_entry_id": je_id
+        }}
     )
     
     await log_audit(current_user['id'], current_user['email'], 'POST', 'payment', payment_id)
-    return {"message": "Payment posted"}
+    return {"message": "Payment posted", "journal_entry_id": je_id}
 
 # ==================== DOCUMENT CANCELLATION ====================
 @api_router.post("/local-purchases/{po_id}/cancel")
