@@ -158,6 +158,14 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Source badge showing transaction origin (auto_payment, manual_exchange, etc.)
 - **API:** `GET /api/accounting/ledger/{account_code}`
 
+### Feature ✅ - Expense Recording with COGS Support
+- **Enhanced Expense recording dropdown** to include all debit-able account types:
+  - **COST OF GOODS SOLD** (5xxx accounts) - Cost of Scrap Sold, Local/Import Purchase Cost, Freight, THC, ED charges, etc.
+  - **EXPENSES** (6xxx accounts) - Salaries, Rent, Utilities, etc.
+  - **ASSETS** - For prepaid expenses or inventory adjustments
+- Accounts are grouped by type with clear section headers
+- Users can now properly record COGS entries when recording direct costs
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix
@@ -303,6 +311,7 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - [x] **Payment Exchange Gain/Loss** - Manual exchange gain/loss feature in Payments module (April 8, 2026)
 - [x] **Exchange Gain/Loss Module** - Standalone page for manual currency revaluation entries (April 8, 2026)
 - [x] **Account Ledgers** - Cash, Petty Cash, and Bank ledger reports with running balance (April 8, 2026)
+- [x] **Expense Recording with COGS** - Enhanced dropdown to include COGS accounts for recording direct costs (April 10, 2026)
 
 ### P0 - In Progress
 - [ ] **Fix Expense Category Dropdown** - Newly added expense categories not showing in dropdown

@@ -54,7 +54,19 @@ export default function ExpensesPage() {
       setExpenses(expRes.data || []);
       
       const accounts = accRes.data || [];
-      setExpenseAccounts(accounts.filter(a => a.account_type === 'expense' && !a.is_header));
+      // Include expense, COGS, and other debit-able accounts for expense recording
+      // Group by account type for easier selection
+      const debitableTypes = ['expense', 'cogs', 'asset'];
+      setExpenseAccounts(accounts.filter(a => 
+        debitableTypes.includes(a.account_type) && !a.is_header
+      ).sort((a, b) => {
+        // Sort by type first, then by code
+        const typeOrder = { expense: 1, cogs: 2, asset: 3 };
+        const typeCompare = (typeOrder[a.account_type] || 99) - (typeOrder[b.account_type] || 99);
+        if (typeCompare !== 0) return typeCompare;
+        return a.account_code.localeCompare(b.account_code);
+      }));
+      
       setPaymentAccounts(accounts.filter(a => 
         a.account_type === 'asset' && 
         !a.is_header && 
@@ -425,17 +437,56 @@ export default function ExpensesPage() {
             </div>
             
             <div>
-              <Label>Expense Account *</Label>
+              <Label>Debit Account * (Expense/COGS/Asset)</Label>
               <Select value={formData.expense_account_id} onValueChange={handleExpenseAccountChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select expense account" />
+                  <SelectValue placeholder="Select account to debit" />
                 </SelectTrigger>
-                <SelectContent>
-                  {expenseAccounts.map(acc => (
-                    <SelectItem key={acc.id} value={acc.id}>
-                      {acc.account_code} - {acc.account_name}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-80">
+                  {/* COGS Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'cogs').length > 0 && (
+                    <>
+                      <SelectItem value="__header_cogs" disabled className="font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-700">
+                        ── COST OF GOODS SOLD ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'cogs').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Expenses Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'expense').length > 0 && (
+                    <>
+                      <SelectItem value="__header_expense" disabled className="font-bold bg-red-50 dark:bg-red-900/30 text-red-700">
+                        ── EXPENSES ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'expense').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Assets Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'asset').length > 0 && (
+                    <>
+                      <SelectItem value="__header_asset" disabled className="font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700">
+                        ── ASSETS ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'asset').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
