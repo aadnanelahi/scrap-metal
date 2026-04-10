@@ -174,6 +174,17 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Print function uses `contract_date || order_date` fallback
   - All views (list, edit, print) are now consistent
 
+### Feature ✅ - Admin Edit/Delete for Payments & Expenses (April 10, 2026)
+- **Payments Page:**
+  - Added Edit button (pencil icon) for draft payments - admin only
+  - Added Delete button (trash icon) for all payments - admin only
+  - Delete removes related journal entry if posted
+  - Backend: `PUT /api/payments/{id}` and `DELETE /api/payments/{id}` endpoints
+- **Expenses Page:**
+  - Added Edit button (pencil icon) - admin only
+  - Both edit/delete update related journal entries and account balances
+  - Backend: `PUT /api/accounting/expenses/{id}` and `PUT /api/accounting/income/{id}` endpoints
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix

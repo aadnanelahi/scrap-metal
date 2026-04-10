@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, Receipt, Wallet, Building, Printer, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Receipt, Wallet, Building, Printer, Trash2, Pencil } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ExpensesPage() {
@@ -24,6 +24,7 @@ export default function ExpensesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   
   const isAdmin = user?.role === 'admin';
   
@@ -82,22 +83,6 @@ export default function ExpensesPage() {
     }
   };
 
-  const openDialog = () => {
-    setFormData({
-      expense_date: toISODateString(new Date()),
-      expense_account_id: '',
-      expense_account_code: '',
-      expense_account_name: '',
-      amount: '',
-      payment_method: 'cash',
-      payment_account_id: '',
-      payment_account_name: '',
-      reference_number: '',
-      description: ''
-    });
-    setDialogOpen(true);
-  };
-
   const handleExpenseAccountChange = (accountId) => {
     const account = expenseAccounts.find(a => a.id === accountId);
     setFormData({
@@ -125,18 +110,60 @@ export default function ExpensesPage() {
 
     setSaving(true);
     try {
-      await expensesAPI.create({
-        ...formData,
-        amount: parseFloat(formData.amount)
-      });
-      toast.success('Expense recorded and journal entry created');
+      if (editingId) {
+        await expensesAPI.update(editingId, {
+          ...formData,
+          amount: parseFloat(formData.amount)
+        });
+        toast.success('Expense updated');
+      } else {
+        await expensesAPI.create({
+          ...formData,
+          amount: parseFloat(formData.amount)
+        });
+        toast.success('Expense recorded and journal entry created');
+      }
       setDialogOpen(false);
+      setEditingId(null);
+      resetForm();
       loadData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to save expense');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEdit = (expense) => {
+    setEditingId(expense.id);
+    setFormData({
+      expense_date: expense.expense_date || toISODateString(new Date()),
+      expense_account_id: expense.expense_account_id || '',
+      expense_account_code: expense.expense_account_code || '',
+      expense_account_name: expense.expense_account_name || '',
+      amount: expense.amount || '',
+      payment_method: expense.payment_method || 'cash',
+      payment_account_id: expense.payment_account_id || '',
+      payment_account_name: expense.payment_account_name || '',
+      reference_number: expense.reference_number || '',
+      description: expense.description || ''
+    });
+    setDialogOpen(true);
+  };
+
+  const resetForm = () => {
+    setFormData({
+      expense_date: toISODateString(new Date()),
+      expense_account_id: '',
+      expense_account_code: '',
+      expense_account_name: '',
+      amount: '',
+      payment_method: 'cash',
+      payment_account_id: '',
+      payment_account_name: '',
+      reference_number: '',
+      description: ''
+    });
   };
 
   const handleDelete = async () => {
@@ -256,7 +283,7 @@ export default function ExpensesPage() {
             Record expenses with automatic journal entries
           </p>
         </div>
-        <Button onClick={openDialog} className="btn-accent">
+        <Button onClick={() => { resetForm(); setEditingId(null); setDialogOpen(true); }} className="btn-accent">
           <Plus className="w-4 h-4 mr-2" />
           New Expense
         </Button>
@@ -360,15 +387,25 @@ export default function ExpensesPage() {
                         <Printer className="w-4 h-4" />
                       </Button>
                       {isAdmin && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          onClick={() => { setDeleteId(exp.id); setDeleteDialogOpen(true); }}
-                          title="Delete permanently"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEdit(exp)}
+                            title="Edit expense"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => { setDeleteId(exp.id); setDeleteDialogOpen(true); }}
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </td>
@@ -404,13 +441,13 @@ export default function ExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* New Expense Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      {/* New/Edit Expense Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingId(null); resetForm(); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5 text-red-600" />
-              Record New Expense
+              {editingId ? 'Edit Expense' : 'Record New Expense'}
             </DialogTitle>
           </DialogHeader>
           

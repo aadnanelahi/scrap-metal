@@ -229,7 +229,9 @@ export const paymentsAPI = {
   list: (params) => api.get('/payments', { params }),
   get: (id) => api.get(`/payments/${id}`),
   create: (data) => api.post('/payments', data),
+  update: (id, data) => api.put(`/payments/${id}`, data),
   post: (id) => api.post(`/payments/${id}/post`),
+  delete: (id) => api.delete(`/payments/${id}`),
 };
 
 // Exchange Gain/Loss
@@ -282,12 +284,14 @@ export const journalEntriesAPI = {
 export const expensesAPI = {
   list: (params) => api.get('/accounting/expenses', { params }),
   create: (data) => api.post('/accounting/expenses', data),
+  update: (id, data) => api.put(`/accounting/expenses/${id}`, data),
   delete: (id) => api.delete(`/accounting/expenses/${id}`),
 };
 
 export const incomeAPI = {
   list: (params) => api.get('/accounting/income', { params }),
   create: (data) => api.post('/accounting/income', data),
+  update: (id, data) => api.put(`/accounting/income/${id}`, data),
   delete: (id) => api.delete(`/accounting/income/${id}`),
 };
 

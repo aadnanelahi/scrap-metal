@@ -3104,6 +3104,82 @@ async def post_payment(payment_id: str, current_user: Dict = Depends(get_current
     await log_audit(current_user['id'], current_user['email'], 'POST', 'payment', payment_id)
     return {"message": "Payment posted", "journal_entry_id": je_id}
 
+@api_router.put("/payments/{payment_id}")
+async def update_payment(payment_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Update payment (admin only, must not be posted)"""
+    require_admin(current_user)
+    
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    if payment.get('status') == 'posted':
+        raise HTTPException(status_code=400, detail="Cannot edit posted payment")
+    
+    # Calculate exchange difference if applicable
+    exchange_difference_amount = 0
+    exchange_difference_type = None
+    
+    if data.get('has_exchange_difference') and data.get('original_currency') != 'AED':
+        original_amount = float(data.get('original_amount', 0))
+        original_rate = float(data.get('original_exchange_rate', 1))
+        payment_rate = float(data.get('payment_exchange_rate', 1))
+        
+        original_aed = original_amount * original_rate
+        payment_aed = original_amount * payment_rate
+        difference = payment_aed - original_aed
+        
+        if abs(difference) >= 0.01:
+            exchange_difference_amount = abs(difference)
+            if data.get('type') == 'received':
+                exchange_difference_type = 'gain' if difference > 0 else 'loss'
+            else:
+                exchange_difference_type = 'gain' if difference < 0 else 'loss'
+    
+    update_data = {
+        "type": data.get('type', payment.get('type')),
+        "party_type": data.get('party_type', payment.get('party_type')),
+        "party_id": data.get('party_id', payment.get('party_id')),
+        "party_name": data.get('party_name', payment.get('party_name')),
+        "payment_date": data.get('payment_date', payment.get('payment_date')),
+        "amount": data.get('amount', payment.get('amount')),
+        "currency": data.get('currency', payment.get('currency')),
+        "payment_method": data.get('payment_method', payment.get('payment_method')),
+        "reference_number": data.get('reference_number', payment.get('reference_number')),
+        "document_number": data.get('document_number', payment.get('document_number')),
+        "notes": data.get('notes', payment.get('notes')),
+        "has_exchange_difference": data.get('has_exchange_difference', False),
+        "original_currency": data.get('original_currency', 'AED'),
+        "original_amount": data.get('original_amount', 0),
+        "original_exchange_rate": data.get('original_exchange_rate', 1),
+        "payment_exchange_rate": data.get('payment_exchange_rate', 1),
+        "exchange_difference_amount": exchange_difference_amount,
+        "exchange_difference_type": exchange_difference_type,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": current_user['id']
+    }
+    
+    await db.payments.update_one({"id": payment_id}, {"$set": update_data})
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'payment', payment_id)
+    return {"message": "Payment updated"}
+
+@api_router.delete("/payments/{payment_id}")
+async def delete_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
+    """Delete payment and related journal entry (admin only)"""
+    require_admin(current_user)
+    
+    payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+    
+    # Delete related journal entry if exists
+    if payment.get('journal_entry_id'):
+        await db.accounting_journal_entries.delete_one({"id": payment['journal_entry_id']})
+    
+    await db.payments.delete_one({"id": payment_id})
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', 'payment', payment_id)
+    return {"message": "Payment deleted"}
+
 # ==================== EXCHANGE GAIN/LOSS ====================
 @api_router.get("/exchange-gain-loss")
 async def list_exchange_gain_loss(
@@ -4291,6 +4367,73 @@ async def create_expense(data: Dict, current_user: Dict = Depends(get_current_us
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'expense_entry', expense['id'])
     return {**expense, "_id": None}
 
+@api_router.put("/accounting/expenses/{expense_id}")
+async def update_expense(expense_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Update an expense entry (Admin only)"""
+    require_admin(current_user)
+    
+    expense = await db.expense_entries.find_one({"id": expense_id}, {"_id": 0})
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense entry not found")
+    
+    company_id = await get_user_company_id(current_user)
+    
+    # Update expense entry
+    update_data = {
+        "expense_date": data.get('expense_date', expense.get('expense_date')),
+        "expense_account_id": data.get('expense_account_id', expense.get('expense_account_id')),
+        "expense_account_code": data.get('expense_account_code', expense.get('expense_account_code')),
+        "expense_account_name": data.get('expense_account_name', expense.get('expense_account_name')),
+        "amount": float(data.get('amount', expense.get('amount'))),
+        "payment_method": data.get('payment_method', expense.get('payment_method')),
+        "payment_account_id": data.get('payment_account_id', expense.get('payment_account_id')),
+        "payment_account_name": data.get('payment_account_name', expense.get('payment_account_name')),
+        "reference_number": data.get('reference_number', expense.get('reference_number')),
+        "description": data.get('description', expense.get('description')),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": current_user['id']
+    }
+    
+    old_amount = expense.get('amount', 0)
+    new_amount = update_data['amount']
+    amount_diff = new_amount - old_amount
+    
+    await db.expense_entries.update_one({"id": expense_id}, {"$set": update_data})
+    
+    # Update account balances if amount changed
+    if amount_diff != 0:
+        if expense.get('expense_account_id'):
+            await db.chart_of_accounts.update_one(
+                {"id": expense['expense_account_id']},
+                {"$inc": {"current_balance": amount_diff}}
+            )
+        if expense.get('payment_account_id'):
+            await db.chart_of_accounts.update_one(
+                {"id": expense['payment_account_id']},
+                {"$inc": {"current_balance": -amount_diff}}
+            )
+    
+    # Update related journal entry if exists
+    if expense.get('journal_entry_id'):
+        await db.accounting_journal_entries.update_one(
+            {"id": expense['journal_entry_id']},
+            {"$set": {
+                "entry_date": update_data['expense_date'],
+                "lines.$[expLine].debit_amount": new_amount,
+                "lines.$[payLine].credit_amount": new_amount,
+                "total_debit": new_amount,
+                "total_credit": new_amount,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }},
+            array_filters=[
+                {"expLine.account_id": expense['expense_account_id']},
+                {"payLine.account_id": expense['payment_account_id']}
+            ]
+        )
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'expense_entry', expense_id)
+    return {"message": "Expense entry updated"}
+
 @api_router.delete("/accounting/expenses/{expense_id}")
 async def delete_expense(expense_id: str, current_user: Dict = Depends(get_current_user)):
     """Permanently delete an expense entry and its related journal entry (Admin only)"""
@@ -4430,6 +4573,71 @@ async def create_income(data: Dict, current_user: Dict = Depends(get_current_use
     
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'income_entry', income['id'])
     return {**income, "_id": None}
+
+@api_router.put("/accounting/income/{income_id}")
+async def update_income(income_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    """Update an income entry (Admin only)"""
+    require_admin(current_user)
+    
+    income = await db.income_entries.find_one({"id": income_id}, {"_id": 0})
+    if not income:
+        raise HTTPException(status_code=404, detail="Income entry not found")
+    
+    # Update income entry
+    update_data = {
+        "income_date": data.get('income_date', income.get('income_date')),
+        "income_account_id": data.get('income_account_id', income.get('income_account_id')),
+        "income_account_code": data.get('income_account_code', income.get('income_account_code')),
+        "income_account_name": data.get('income_account_name', income.get('income_account_name')),
+        "amount": float(data.get('amount', income.get('amount'))),
+        "payment_method": data.get('payment_method', income.get('payment_method')),
+        "payment_account_id": data.get('payment_account_id', income.get('payment_account_id')),
+        "payment_account_name": data.get('payment_account_name', income.get('payment_account_name')),
+        "reference_number": data.get('reference_number', income.get('reference_number')),
+        "description": data.get('description', income.get('description')),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_by": current_user['id']
+    }
+    
+    old_amount = income.get('amount', 0)
+    new_amount = update_data['amount']
+    amount_diff = new_amount - old_amount
+    
+    await db.income_entries.update_one({"id": income_id}, {"$set": update_data})
+    
+    # Update account balances if amount changed
+    if amount_diff != 0:
+        if income.get('payment_account_id'):
+            await db.chart_of_accounts.update_one(
+                {"id": income['payment_account_id']},
+                {"$inc": {"current_balance": amount_diff}}
+            )
+        if income.get('income_account_id'):
+            await db.chart_of_accounts.update_one(
+                {"id": income['income_account_id']},
+                {"$inc": {"current_balance": amount_diff}}
+            )
+    
+    # Update related journal entry if exists
+    if income.get('journal_entry_id'):
+        await db.accounting_journal_entries.update_one(
+            {"id": income['journal_entry_id']},
+            {"$set": {
+                "entry_date": update_data['income_date'],
+                "lines.$[payLine].debit_amount": new_amount,
+                "lines.$[incLine].credit_amount": new_amount,
+                "total_debit": new_amount,
+                "total_credit": new_amount,
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            }},
+            array_filters=[
+                {"payLine.account_id": income['payment_account_id']},
+                {"incLine.account_id": income['income_account_id']}
+            ]
+        )
+    
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'income_entry', income_id)
+    return {"message": "Income entry updated"}
 
 @api_router.delete("/accounting/income/{income_id}")
 async def delete_income(income_id: str, current_user: Dict = Depends(get_current_user)):

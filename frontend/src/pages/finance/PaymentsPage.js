@@ -7,11 +7,13 @@ import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users, TrendingUp, TrendingDown, ArrowRightLeft } from 'lucide-react';
+import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users, TrendingUp, TrendingDown, ArrowRightLeft, Pencil, Trash2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PaymentsPage() {
+  const { user } = useAuth();
   const [payments, setPayments] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -20,6 +22,12 @@ export default function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  const isAdmin = user?.role === 'admin';
   
   const [formData, setFormData] = useState({
     type: 'received',
@@ -95,15 +103,59 @@ export default function PaymentsPage() {
 
     setSaving(true);
     try {
-      await paymentsAPI.create(formData);
-      toast.success('Payment created');
+      if (editingId) {
+        await paymentsAPI.update(editingId, formData);
+        toast.success('Payment updated');
+      } else {
+        await paymentsAPI.create(formData);
+        toast.success('Payment created');
+      }
       setShowDialog(false);
       resetForm();
       loadData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to create payment');
+      toast.error(error.response?.data?.detail || 'Failed to save payment');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEdit = (payment) => {
+    setEditingId(payment.id);
+    setFormData({
+      type: payment.type || 'received',
+      party_type: payment.party_type || 'customer',
+      party_id: payment.party_id || '',
+      party_name: payment.party_name || '',
+      payment_date: payment.payment_date || toISODateString(new Date()),
+      amount: payment.amount || 0,
+      currency: payment.currency || 'AED',
+      payment_method: payment.payment_method || 'cash',
+      reference_number: payment.reference_number || '',
+      document_number: payment.document_number || '',
+      notes: payment.notes || '',
+      original_currency: payment.original_currency || 'AED',
+      original_amount: payment.original_amount || 0,
+      original_exchange_rate: payment.original_exchange_rate || 1,
+      payment_exchange_rate: payment.payment_exchange_rate || 1,
+      has_exchange_difference: payment.has_exchange_difference || false
+    });
+    setShowDialog(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    setDeleting(true);
+    try {
+      await paymentsAPI.delete(deleteId);
+      toast.success('Payment deleted successfully');
+      setDeleteDialogOpen(false);
+      setDeleteId(null);
+      loadData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to delete payment');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -123,6 +175,7 @@ export default function PaymentsPage() {
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setFormData({
       type: 'received',
       party_type: 'customer',
@@ -203,14 +256,14 @@ export default function PaymentsPage() {
         </div>
         <Dialog open={showDialog} onOpenChange={setShowDialog}>
           <DialogTrigger asChild>
-            <Button className="btn-accent gap-2" data-testid="new-payment-btn">
+            <Button className="btn-accent gap-2" data-testid="new-payment-btn" onClick={() => { resetForm(); }}>
               <Plus className="w-4 h-4" />
               New Payment
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>New Payment</DialogTitle>
+              <DialogTitle>{editingId ? 'Edit Payment' : 'New Payment'}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
@@ -526,14 +579,39 @@ export default function PaymentsPage() {
                         <Printer className="w-4 h-4" />
                       </Button>
                       {payment.status !== 'posted' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handlePost(payment.id)}
+                            data-testid={`post-payment-btn-${payment.id}`}
+                          >
+                            <Check className="w-4 h-4 mr-1" />
+                            Post
+                          </Button>
+                          {/* Admin Edit */}
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(payment)}
+                              data-testid={`edit-payment-btn-${payment.id}`}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {/* Admin Delete */}
+                      {isAdmin && (
                         <Button
                           size="sm"
-                          variant="outline"
-                          onClick={() => handlePost(payment.id)}
-                          data-testid={`post-payment-btn-${payment.id}`}
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => { setDeleteId(payment.id); setDeleteDialogOpen(true); }}
+                          data-testid={`delete-payment-btn-${payment.id}`}
                         >
-                          <Check className="w-4 h-4 mr-1" />
-                          Post
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
@@ -544,6 +622,27 @@ export default function PaymentsPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Payment</DialogTitle>
+            <DialogDescription>
+              This will permanently delete the payment entry and its related journal entry (if posted).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-600">Are you sure you want to delete this payment?</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
