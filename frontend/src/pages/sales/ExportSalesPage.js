@@ -87,8 +87,8 @@ export default function ExportSalesPage() {
             ) : (
               sales.map((s) => (
                 <tr key={s.id}>
-                  <td className="font-mono font-medium">{s.order_number || s.contract_number}</td>
-                  <td>{formatDate(s.order_date || s.contract_date)}</td>
+                  <td className="font-mono font-medium">{s.contract_number || s.order_number}</td>
+                  <td>{formatDate(s.contract_date || s.order_date)}</td>
                   <td className="font-medium">{s.customer_name}</td>
                   <td>{s.currency}</td>
                   <td className="text-right font-mono font-bold">{formatCurrency(s.total_amount, s.currency)}</td>
@@ -105,7 +105,7 @@ export default function ExportSalesPage() {
                       )}
                       <Button size="sm" variant="ghost" onClick={() => {
                         const html = generateExportSalesPrintHTML(s, company);
-                        printDocument(html, `ESC-${s.order_number || s.contract_number}`);
+                        printDocument(html, `ESC-${s.contract_number || s.order_number}`);
                       }} data-testid={`esc-print-${s.id}`}>
                         <Printer className="w-4 h-4" />
                       </Button>

@@ -616,8 +616,8 @@ export const generateExportSalesPrintHTML = (contract, company = null) => {
     <div class="doc-info">
       <div class="doc-info-left">
         <h3>Contract Details</h3>
-        <p><strong>Contract No:</strong> ${contract.order_number || '-'}</p>
-        <p><strong>Date:</strong> ${formatDate(contract.order_date)}</p>
+        <p><strong>Contract No:</strong> ${contract.order_number || contract.contract_number || '-'}</p>
+        <p><strong>Date:</strong> ${formatDate(contract.contract_date || contract.order_date)}</p>
         <p><strong>Delivery Date:</strong> ${contract.delivery_date ? formatDate(contract.delivery_date) : '-'}</p>
         <p><strong>Incoterm:</strong> ${contract.incoterm_code || '-'}</p>
         <p><strong>Status:</strong> <span class="status-badge ${statusClass}">${contract.status || 'draft'}</span></p>

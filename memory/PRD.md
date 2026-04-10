@@ -166,6 +166,14 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
 - Accounts are grouped by type with clear section headers
 - Users can now properly record COGS entries when recording direct costs
 
+### Bug Fix ✅ - Contract Date Mismatch in Export Sales (April 10, 2026)
+- **Issue:** Export Sales list showed wrong date (`order_date`) while edit form used (`contract_date`)
+- **Fixed:** 
+  - List view now uses `contract_date` as primary date field
+  - Edit form correctly binds to `contract_date` 
+  - Print function uses `contract_date || order_date` fallback
+  - All views (list, edit, print) are now consistent
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix
