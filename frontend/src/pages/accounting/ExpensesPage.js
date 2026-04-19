@@ -55,14 +55,14 @@ export default function ExpensesPage() {
       setExpenses(expRes.data || []);
       
       const accounts = accRes.data || [];
-      // Include expense, COGS, and other debit-able accounts for expense recording
+      // Include ALL account types for expense recording (user requested all COA heads)
       // Group by account type for easier selection
-      const debitableTypes = ['expense', 'cogs', 'asset'];
+      const allTypes = ['cogs', 'expense', 'asset', 'liability', 'equity', 'income'];
       setExpenseAccounts(accounts.filter(a => 
-        debitableTypes.includes(a.account_type) && !a.is_header
+        allTypes.includes(a.account_type) && !a.is_header
       ).sort((a, b) => {
         // Sort by type first, then by code
-        const typeOrder = { expense: 1, cogs: 2, asset: 3 };
+        const typeOrder = { cogs: 1, expense: 2, asset: 3, liability: 4, equity: 5, income: 6 };
         const typeCompare = (typeOrder[a.account_type] || 99) - (typeOrder[b.account_type] || 99);
         if (typeCompare !== 0) return typeCompare;
         return a.account_code.localeCompare(b.account_code);
@@ -474,7 +474,7 @@ export default function ExpensesPage() {
             </div>
             
             <div>
-              <Label>Debit Account * (Expense/COGS/Asset)</Label>
+              <Label>Debit Account * (All COA Accounts)</Label>
               <Select value={formData.expense_account_id} onValueChange={handleExpenseAccountChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select account to debit" />
@@ -517,6 +517,51 @@ export default function ExpensesPage() {
                         ── ASSETS ──
                       </SelectItem>
                       {expenseAccounts.filter(a => a.account_type === 'asset').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Liabilities Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'liability').length > 0 && (
+                    <>
+                      <SelectItem value="__header_liability" disabled className="font-bold bg-purple-50 dark:bg-purple-900/30 text-purple-700">
+                        ── LIABILITIES ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'liability').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Equity Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'equity').length > 0 && (
+                    <>
+                      <SelectItem value="__header_equity" disabled className="font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700">
+                        ── EQUITY ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'equity').map(acc => (
+                        <SelectItem key={acc.id} value={acc.id}>
+                          <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
+                          {acc.account_name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  
+                  {/* Income Section */}
+                  {expenseAccounts.filter(a => a.account_type === 'income').length > 0 && (
+                    <>
+                      <SelectItem value="__header_income" disabled className="font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700">
+                        ── INCOME ──
+                      </SelectItem>
+                      {expenseAccounts.filter(a => a.account_type === 'income').map(acc => (
                         <SelectItem key={acc.id} value={acc.id}>
                           <span className="font-mono text-xs text-slate-500 mr-2">{acc.account_code}</span>
                           {acc.account_name}

@@ -158,13 +158,17 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Source badge showing transaction origin (auto_payment, manual_exchange, etc.)
 - **API:** `GET /api/accounting/ledger/{account_code}`
 
-### Feature ✅ - Expense Recording with COGS Support
-- **Enhanced Expense recording dropdown** to include all debit-able account types:
-  - **COST OF GOODS SOLD** (5xxx accounts) - Cost of Scrap Sold, Local/Import Purchase Cost, Freight, THC, ED charges, etc.
-  - **EXPENSES** (6xxx accounts) - Salaries, Rent, Utilities, etc.
-  - **ASSETS** - For prepaid expenses or inventory adjustments
-- Accounts are grouped by type with clear section headers
-- Users can now properly record COGS entries when recording direct costs
+### Feature ✅ - Expense Recording with ALL COA Accounts
+- **Enhanced Expense recording dropdown** to include ALL Chart of Account types:
+  - **COST OF GOODS SOLD** (5xxx accounts) - amber header
+  - **EXPENSES** (6xxx accounts) - red header  
+  - **ASSETS** (1xxx accounts) - blue header
+  - **LIABILITIES** (2xxx accounts) - purple header
+  - **EQUITY** (3xxx accounts) - indigo header
+  - **INCOME** (4xxx accounts) - emerald header
+- Accounts are grouped by type with color-coded section headers
+- Label updated to "Debit Account * (All COA Accounts)"
+- Users can now record entries against ANY account type
 
 ### Bug Fix ✅ - Contract Date Mismatch in Export Sales (April 10, 2026)
 - **Issue:** Export Sales list showed wrong date (`order_date`) while edit form used (`contract_date`)
