@@ -189,6 +189,11 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Both edit/delete update related journal entries and account balances
   - Backend: `PUT /api/accounting/expenses/{id}` and `PUT /api/accounting/income/{id}` endpoints
 
+### Feature ✅ - Column & Date Filters on Journal Entries and Payments (April 19, 2026)
+- **Journal Entries Page:** Filter by From/To Date, Entry #, Reference, Description, Source (Manual/Purchase/Sale/Expense/Income/Payment/Reversal), Status (Posted/Reversed)
+- **Payments Page:** Filter by From/To Date, Receipt #, Party Name, Type (Receipt/Payment), Method (Cash/Bank Transfer/Cheque/Credit Card), Status (Draft/Posted)
+- Both pages show "Showing X of Y" count, toggle-able filter panel, clear filters button with active filter count badge
+
 ### Feature ✅ - Print Journal Entries (April 19, 2026)
 - Added **Print** button (printer icon) to all Journal Entries
 - Print generates professional Journal Entry Voucher with:

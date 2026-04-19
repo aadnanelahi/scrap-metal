@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, BookOpen, Eye, RotateCcw, Trash2, Printer } from 'lucide-react';
+import { Plus, Loader2, BookOpen, Eye, RotateCcw, Trash2, Printer, Filter, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function JournalEntriesPage() {
@@ -27,6 +27,18 @@ export default function JournalEntriesPage() {
   const [selectedEntry, setSelectedEntry] = useState(null);
   const [saving, setSaving] = useState(false);
   const [reverseReason, setReverseReason] = useState('');
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    entryNumber: '',
+    reference: '',
+    description: '',
+    source: 'all',
+    status: 'all'
+  });
+  const [showFilters, setShowFilters] = useState(false);
   
   const isAdmin = user?.role === 'admin';
   
@@ -325,6 +337,46 @@ export default function JournalEntriesPage() {
 
   const totals = calculateTotals();
 
+  // Filter entries
+  const filteredEntries = entries.filter(entry => {
+    // Date filter
+    if (filters.startDate && entry.entry_date < filters.startDate) return false;
+    if (filters.endDate && entry.entry_date > filters.endDate) return false;
+    
+    // Entry number filter
+    if (filters.entryNumber && !entry.entry_number?.toLowerCase().includes(filters.entryNumber.toLowerCase())) return false;
+    
+    // Reference filter
+    if (filters.reference && !entry.reference_number?.toLowerCase().includes(filters.reference.toLowerCase())) return false;
+    
+    // Description filter
+    if (filters.description && !entry.description?.toLowerCase().includes(filters.description.toLowerCase())) return false;
+    
+    // Source/type filter
+    if (filters.source !== 'all' && entry.source !== filters.source && entry.reference_type !== filters.source) return false;
+    
+    // Status filter
+    if (filters.status === 'posted' && entry.is_reversed) return false;
+    if (filters.status === 'reversed' && !entry.is_reversed) return false;
+    
+    return true;
+  });
+
+  const clearFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      entryNumber: '',
+      reference: '',
+      description: '',
+      source: 'all',
+      status: 'all'
+    });
+  };
+
+  const hasActiveFilters = filters.startDate || filters.endDate || filters.entryNumber || 
+    filters.reference || filters.description || filters.source !== 'all' || filters.status !== 'all';
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -351,6 +403,113 @@ export default function JournalEntriesPage() {
         </Button>
       </div>
 
+      {/* Filters Panel */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+            {hasActiveFilters && <Badge className="bg-orange-500 text-white ml-2">{Object.values(filters).filter(v => v && v !== 'all').length}</Badge>}
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-red-500 gap-1">
+              <X className="w-4 h-4" />
+              Clear Filters
+            </Button>
+          )}
+        </div>
+        
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+            <div>
+              <Label className="text-xs">From Date</Label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">To Date</Label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Entry #</Label>
+              <Input
+                placeholder="JE-..."
+                value={filters.entryNumber}
+                onChange={(e) => setFilters({...filters, entryNumber: e.target.value})}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Reference</Label>
+              <Input
+                placeholder="Reference..."
+                value={filters.reference}
+                onChange={(e) => setFilters({...filters, reference: e.target.value})}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Description</Label>
+              <Input
+                placeholder="Search..."
+                value={filters.description}
+                onChange={(e) => setFilters({...filters, description: e.target.value})}
+                className="h-9"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Source</Label>
+              <Select value={filters.source} onValueChange={(v) => setFilters({...filters, source: v})}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sources</SelectItem>
+                  <SelectItem value="manual">Manual</SelectItem>
+                  <SelectItem value="auto_purchase">Purchase</SelectItem>
+                  <SelectItem value="auto_sale">Sale</SelectItem>
+                  <SelectItem value="auto_expense">Expense</SelectItem>
+                  <SelectItem value="auto_income">Income</SelectItem>
+                  <SelectItem value="auto_payment">Payment</SelectItem>
+                  <SelectItem value="reversal">Reversal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Status</Label>
+              <Select value={filters.status} onValueChange={(v) => setFilters({...filters, status: v})}>
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="posted">Posted</SelectItem>
+                  <SelectItem value="reversed">Reversed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+        
+        <div className="text-sm text-slate-500 mt-2">
+          Showing {filteredEntries.length} of {entries.length} entries
+        </div>
+      </div>
+
       {/* Entries Table */}
       <div className="card overflow-hidden">
         <table className="data-table">
@@ -367,14 +526,14 @@ export default function JournalEntriesPage() {
             </tr>
           </thead>
           <tbody>
-            {entries.length === 0 ? (
+            {filteredEntries.length === 0 ? (
               <tr>
                 <td colSpan="8" className="text-center py-8 text-slate-500">
-                  No journal entries yet
+                  {entries.length === 0 ? 'No journal entries yet' : 'No entries match the filters'}
                 </td>
               </tr>
             ) : (
-              entries.map((entry) => (
+              filteredEntries.map((entry) => (
                 <tr key={entry.id} className={entry.is_reversed ? 'opacity-50' : ''}>
                   <td className="font-mono font-medium">{entry.entry_number}</td>
                   <td>{formatDate(entry.entry_date)}</td>

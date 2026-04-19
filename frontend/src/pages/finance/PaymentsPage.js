@@ -9,7 +9,7 @@ import { Textarea } from '../../components/ui/textarea';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users, TrendingUp, TrendingDown, ArrowRightLeft, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Printer, Loader2, Check, Wallet, CreditCard, Building2, Users, TrendingUp, TrendingDown, ArrowRightLeft, Pencil, Trash2, Filter, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function PaymentsPage() {
@@ -26,6 +26,18 @@ export default function PaymentsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  
+  // Filters
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    receiptNumber: '',
+    partyName: '',
+    type: 'all',
+    method: 'all',
+    status: 'all'
+  });
+  const [showFilters, setShowFilters] = useState(false);
   
   const isAdmin = user?.role === 'admin';
   
@@ -238,6 +250,33 @@ export default function PaymentsPage() {
   const exchangeDiff = calculateExchangeDifference();
 
   const partyList = formData.party_type === 'customer' ? customers : suppliers;
+
+  // Filter payments
+  const filteredPayments = payments.filter(payment => {
+    if (filters.startDate && payment.payment_date < filters.startDate) return false;
+    if (filters.endDate && payment.payment_date > filters.endDate) return false;
+    if (filters.receiptNumber && !payment.receipt_number?.toLowerCase().includes(filters.receiptNumber.toLowerCase())) return false;
+    if (filters.partyName && !payment.party_name?.toLowerCase().includes(filters.partyName.toLowerCase())) return false;
+    if (filters.type !== 'all' && payment.type !== filters.type) return false;
+    if (filters.method !== 'all' && payment.payment_method !== filters.method) return false;
+    if (filters.status !== 'all' && payment.status !== filters.status) return false;
+    return true;
+  });
+
+  const clearFilters = () => {
+    setFilters({
+      startDate: '',
+      endDate: '',
+      receiptNumber: '',
+      partyName: '',
+      type: 'all',
+      method: 'all',
+      status: 'all'
+    });
+  };
+
+  const hasActiveFilters = filters.startDate || filters.endDate || filters.receiptNumber || 
+    filters.partyName || filters.type !== 'all' || filters.method !== 'all' || filters.status !== 'all';
 
   if (loading) {
     return (
@@ -508,6 +547,119 @@ export default function PaymentsPage() {
         </div>
       </div>
 
+      {/* Filters Panel */}
+      <div className="kpi-card" data-testid="payments-filters-panel">
+        <div className="flex items-center justify-between mb-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+            data-testid="toggle-payments-filters-btn"
+          >
+            <Filter className="w-4 h-4" />
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+            {hasActiveFilters && <Badge className="bg-orange-500 text-white ml-2">{Object.values(filters).filter(v => v && v !== 'all').length}</Badge>}
+          </Button>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="text-red-500 gap-1" data-testid="clear-payments-filters-btn">
+              <X className="w-4 h-4" />
+              Clear Filters
+            </Button>
+          )}
+        </div>
+        
+        {showFilters && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg" data-testid="payments-filters-grid">
+            <div>
+              <Label className="text-xs">From Date</Label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => setFilters({...filters, startDate: e.target.value})}
+                className="h-9"
+                data-testid="filter-start-date"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">To Date</Label>
+              <Input
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => setFilters({...filters, endDate: e.target.value})}
+                className="h-9"
+                data-testid="filter-end-date"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Receipt #</Label>
+              <Input
+                placeholder="PV-/RV-..."
+                value={filters.receiptNumber}
+                onChange={(e) => setFilters({...filters, receiptNumber: e.target.value})}
+                className="h-9"
+                data-testid="filter-receipt-number"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Party Name</Label>
+              <Input
+                placeholder="Search party..."
+                value={filters.partyName}
+                onChange={(e) => setFilters({...filters, partyName: e.target.value})}
+                className="h-9"
+                data-testid="filter-party-name"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Type</Label>
+              <Select value={filters.type} onValueChange={(v) => setFilters({...filters, type: v})}>
+                <SelectTrigger className="h-9" data-testid="filter-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="received">Receipt</SelectItem>
+                  <SelectItem value="paid">Payment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Method</Label>
+              <Select value={filters.method} onValueChange={(v) => setFilters({...filters, method: v})}>
+                <SelectTrigger className="h-9" data-testid="filter-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Methods</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="cheque">Cheque</SelectItem>
+                  <SelectItem value="credit_card">Credit Card</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs">Status</Label>
+              <Select value={filters.status} onValueChange={(v) => setFilters({...filters, status: v})}>
+                <SelectTrigger className="h-9" data-testid="filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="posted">Posted</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+        
+        <div className="text-sm text-slate-500 mt-2">
+          Showing {filteredPayments.length} of {payments.length} payments
+        </div>
+      </div>
+
       {/* Payments Table */}
       <div className="kpi-card p-0 overflow-hidden">
         <table className="erp-table" data-testid="payments-table">
@@ -525,15 +677,15 @@ export default function PaymentsPage() {
             </tr>
           </thead>
           <tbody>
-            {payments.length === 0 ? (
+            {filteredPayments.length === 0 ? (
               <tr>
                 <td colSpan={9} className="text-center py-12 text-slate-400">
                   <Wallet className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>No payments yet</p>
+                  <p>{payments.length === 0 ? 'No payments yet' : 'No payments match the filters'}</p>
                 </td>
               </tr>
             ) : (
-              payments.map((payment) => (
+              filteredPayments.map((payment) => (
                 <tr key={payment.id}>
                   <td className="font-mono font-medium">{payment.receipt_number}</td>
                   <td>
