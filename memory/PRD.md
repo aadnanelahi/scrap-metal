@@ -185,6 +185,16 @@ Production-ready, commercial ERP system for Scrap Metal Trading Companies. UAE-f
   - Both edit/delete update related journal entries and account balances
   - Backend: `PUT /api/accounting/expenses/{id}` and `PUT /api/accounting/income/{id}` endpoints
 
+### Feature ✅ - Print Journal Entries (April 19, 2026)
+- Added **Print** button (printer icon) to all Journal Entries
+- Print generates professional Journal Entry Voucher with:
+  - Company header with logo
+  - Entry number, date, reference, status
+  - Description and source type badge
+  - Full line items table (Account Code, Account Name, Description, Debit, Credit)
+  - Totals row
+  - Signature boxes (Prepared By, Checked By, Approved By)
+
 ## Recent Changes (March 15, 2026)
 
 ### Bug Fix ✅ - Complete Currency Conversion Fix

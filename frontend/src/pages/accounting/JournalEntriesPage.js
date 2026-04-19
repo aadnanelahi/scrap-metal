@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { journalEntriesAPI, chartOfAccountsAPI } from '../../lib/api';
-import { formatCurrency, formatDate, toISODateString } from '../../lib/utils';
+import { journalEntriesAPI, chartOfAccountsAPI, companiesAPI } from '../../lib/api';
+import { formatCurrency, formatDate, toISODateString, printDocument } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
@@ -9,13 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Loader2, BookOpen, Eye, RotateCcw, Trash2 } from 'lucide-react';
+import { Plus, Loader2, BookOpen, Eye, RotateCcw, Trash2, Printer } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function JournalEntriesPage() {
   const { user } = useAuth();
   const [entries, setEntries] = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [company, setCompany] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -42,12 +43,15 @@ export default function JournalEntriesPage() {
 
   const loadData = async () => {
     try {
-      const [entriesRes, accRes] = await Promise.all([
+      const [entriesRes, accRes, companiesRes] = await Promise.all([
         journalEntriesAPI.list(),
-        chartOfAccountsAPI.list()
+        chartOfAccountsAPI.list(),
+        companiesAPI.list()
       ]);
       setEntries(entriesRes.data || []);
       setAccounts((accRes.data || []).filter(a => !a.is_header));
+      const companies = companiesRes.data || [];
+      setCompany(companies.find(c => c.is_active) || companies[0] || null);
     } catch (error) {
       toast.error('Failed to load data');
     } finally {
@@ -77,6 +81,132 @@ export default function JournalEntriesPage() {
     setSelectedEntry(entry);
     setReverseReason('');
     setReverseDialogOpen(true);
+  };
+
+  const handlePrint = (entry) => {
+    const html = generateJournalEntryHTML(entry, company);
+    printDocument(html, `JE-${entry.entry_number}`);
+  };
+
+  const generateJournalEntryHTML = (entry, company) => {
+    const statusClass = entry.is_reversed ? 'reversed' : 'posted';
+    const statusText = entry.is_reversed ? 'REVERSED' : 'POSTED';
+    
+    const sourceLabels = {
+      'manual': 'Manual Entry',
+      'auto_purchase': 'Purchase Order',
+      'auto_sale': 'Sales Order',
+      'auto_expense': 'Expense Entry',
+      'auto_income': 'Income Entry',
+      'auto_payment': 'Payment',
+      'manual_exchange': 'Exchange Adjustment',
+      'reversal': 'Reversal Entry'
+    };
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Journal Entry - ${entry.entry_number}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; font-size: 12px; }
+          .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+          .logo { max-height: 50px; margin-bottom: 10px; }
+          .company-name { font-size: 20px; font-weight: bold; }
+          .doc-title { font-size: 16px; color: #7c3aed; margin-top: 10px; font-weight: bold; }
+          .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+          .info-item { padding: 10px; background: #f9f9f9; border-radius: 5px; }
+          .info-label { font-size: 10px; color: #666; text-transform: uppercase; }
+          .info-value { font-size: 14px; font-weight: bold; margin-top: 3px; }
+          .status-posted { color: #059669; }
+          .status-reversed { color: #d97706; }
+          table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+          th { background: #f5f5f5; font-weight: bold; text-transform: uppercase; font-size: 11px; }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .total-row { background: #f0f0f0; font-weight: bold; }
+          .debit { color: #059669; }
+          .credit { color: #dc2626; }
+          .description-box { background: #f9f9f9; padding: 15px; border-radius: 5px; margin: 20px 0; }
+          .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 50px; }
+          .signature-box { text-align: center; padding-top: 40px; border-top: 1px solid #333; }
+          .footer { margin-top: 30px; text-align: center; font-size: 10px; color: #888; }
+          .source-badge { display: inline-block; padding: 3px 8px; background: #e0e7ff; color: #4338ca; border-radius: 4px; font-size: 10px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          ${company?.logo_url ? `<img src="${company.logo_url}" class="logo" alt="Logo">` : ''}
+          <div class="company-name">${company?.name || 'Company Name'}</div>
+          <div>${company?.address || ''}</div>
+          <div class="doc-title">JOURNAL ENTRY VOUCHER</div>
+        </div>
+        
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Entry Number</div>
+            <div class="info-value">${entry.entry_number}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Entry Date</div>
+            <div class="info-value">${formatDate(entry.entry_date)}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Reference</div>
+            <div class="info-value">${entry.reference_number || entry.reference_id || 'N/A'}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Status</div>
+            <div class="info-value status-${statusClass}">${statusText}</div>
+          </div>
+        </div>
+        
+        <div class="description-box">
+          <strong>Description:</strong> ${entry.description || 'N/A'}<br>
+          <strong>Source:</strong> <span class="source-badge">${sourceLabels[entry.source] || entry.source || 'Manual'}</span>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 15%">Account Code</th>
+              <th style="width: 35%">Account Name</th>
+              <th style="width: 25%">Description</th>
+              <th class="text-right" style="width: 12.5%">Debit</th>
+              <th class="text-right" style="width: 12.5%">Credit</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(entry.lines || []).map(line => `
+              <tr>
+                <td class="text-center"><strong>${line.account_code || '-'}</strong></td>
+                <td>${line.account_name || '-'}</td>
+                <td>${line.description || '-'}</td>
+                <td class="text-right debit">${line.debit_amount > 0 ? formatCurrency(line.debit_amount) : '-'}</td>
+                <td class="text-right credit">${line.credit_amount > 0 ? formatCurrency(line.credit_amount) : '-'}</td>
+              </tr>
+            `).join('')}
+            <tr class="total-row">
+              <td colspan="3" class="text-right"><strong>TOTALS</strong></td>
+              <td class="text-right debit"><strong>${formatCurrency(entry.total_debit)}</strong></td>
+              <td class="text-right credit"><strong>${formatCurrency(entry.total_credit)}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        
+        <div class="signatures">
+          <div class="signature-box">Prepared By</div>
+          <div class="signature-box">Checked By</div>
+          <div class="signature-box">Approved By</div>
+        </div>
+        
+        <div class="footer">
+          Generated on ${new Date().toLocaleString()}
+        </div>
+      </body>
+      </html>
+    `;
   };
 
   const addLine = () => {
@@ -271,11 +401,14 @@ export default function JournalEntriesPage() {
                   </td>
                   <td>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => openViewDialog(entry)}>
+                      <Button size="sm" variant="ghost" onClick={() => handlePrint(entry)} title="Print">
+                        <Printer className="w-4 h-4" />
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => openViewDialog(entry)} title="View Details">
                         <Eye className="w-4 h-4" />
                       </Button>
                       {!entry.is_reversed && entry.reference_type === 'manual' && (
-                        <Button size="sm" variant="ghost" className="text-yellow-600" onClick={() => openReverseDialog(entry)}>
+                        <Button size="sm" variant="ghost" className="text-yellow-600" onClick={() => openReverseDialog(entry)} title="Reverse">
                           <RotateCcw className="w-4 h-4" />
                         </Button>
                       )}
