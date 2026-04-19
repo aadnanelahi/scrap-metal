@@ -47,7 +47,7 @@ export default function BalanceSheetPage() {
           ${report?.assets?.items?.map(item => `
             <tr>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.account_code} - ${item.account_name}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.balance)}</td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.amount || item.balance || 0)}</td>
             </tr>
           `).join('') || '<tr><td colspan="2" style="padding:8px;text-align:center;">No assets</td></tr>'}
           <tr style="font-weight:bold;background:#f1f5f9;">
@@ -69,7 +69,7 @@ export default function BalanceSheetPage() {
           ${report?.liabilities?.items?.map(item => `
             <tr>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.account_code} - ${item.account_name}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.balance)}</td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.amount || item.balance || 0)}</td>
             </tr>
           `).join('') || '<tr><td colspan="2" style="padding:8px;text-align:center;">No liabilities</td></tr>'}
           <tr style="font-weight:bold;background:#f1f5f9;">
@@ -91,7 +91,7 @@ export default function BalanceSheetPage() {
           ${report?.equity?.items?.map(item => `
             <tr>
               <td style="padding:8px;border:1px solid #e2e8f0;">${item.account_code} - ${item.account_name}</td>
-              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.balance)}</td>
+              <td style="padding:8px;text-align:right;border:1px solid #e2e8f0;">${formatCurrency(item.amount || item.balance || 0)}</td>
             </tr>
           `).join('') || '<tr><td colspan="2" style="padding:8px;text-align:center;">No equity</td></tr>'}
           <tr style="font-weight:bold;background:#f1f5f9;">
@@ -172,7 +172,7 @@ export default function BalanceSheetPage() {
                   {report.assets.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm p-2 bg-slate-50 dark:bg-slate-800 rounded">
                       <span>{item.account_code} - {item.account_name}</span>
-                      <span className="font-mono">{formatCurrency(item.balance)}</span>
+                      <span className="font-mono">{formatCurrency(item.amount || item.balance || 0)}</span>
                     </div>
                   ))}
                 </div>
@@ -200,7 +200,7 @@ export default function BalanceSheetPage() {
                   {report.liabilities.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm p-2 bg-slate-50 dark:bg-slate-800 rounded">
                       <span>{item.account_code} - {item.account_name}</span>
-                      <span className="font-mono">{formatCurrency(item.balance)}</span>
+                      <span className="font-mono">{formatCurrency(item.amount || item.balance || 0)}</span>
                     </div>
                   ))}
                 </div>
@@ -228,7 +228,7 @@ export default function BalanceSheetPage() {
                   {report.equity.items.map((item, idx) => (
                     <div key={idx} className="flex justify-between text-sm p-2 bg-slate-50 dark:bg-slate-800 rounded">
                       <span>{item.account_code} - {item.account_name}</span>
-                      <span className="font-mono">{formatCurrency(item.balance)}</span>
+                      <span className="font-mono">{formatCurrency(item.amount || item.balance || 0)}</span>
                     </div>
                   ))}
                 </div>
