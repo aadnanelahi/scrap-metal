@@ -35,47 +35,39 @@ JWT_SECRET = os.environ.get('JWT_SECRET', 'scrapos_secret_key_change_in_producti
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
 
-# SMTP / Email Configuration
-SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
-SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
-SMTP_USER = os.environ.get('SMTP_USER', '')
-SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
-SMTP_FROM = os.environ.get('SMTP_FROM', 'noreply@techsightinnovation.com')
+# Email Configuration (SendGrid HTTP API – works on Railway where SMTP is blocked)
+SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+EMAIL_FROM = os.environ.get('EMAIL_FROM', 'noreply@techsightinnovation.com')
 SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL', 'aadnan@techsightinnovation.com')
 
 async def send_email(to_emails: List[str], subject: str, html_body: str):
-    """Send an HTML email via SMTP. Runs in thread to avoid blocking."""
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logging.warning("SMTP not configured – skipping email")
+    """Send an HTML email via SendGrid HTTP API. Runs in thread to avoid blocking."""
+    if not SENDGRID_API_KEY:
+        logging.warning("SENDGRID_API_KEY not configured – skipping email")
         return
+    import json as _json
+    payload = _json.dumps({
+        "personalizations": [{"to": [{"email": e} for e in to_emails]}],
+        "from": {"email": EMAIL_FROM},
+        "subject": subject,
+        "content": [{"type": "text/html", "value": html_body}]
+    })
     def _send():
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = SMTP_FROM
-        msg['To'] = ', '.join(to_emails)
-        msg.attach(MIMEText(html_body, 'html'))
-        ctx = ssl.create_default_context()
-        # Try port 465 (SSL) first, fallback to 587 (STARTTLS)
-        for port in [465, 587]:
-            try:
-                if port == 465:
-                    server = smtplib.SMTP_SSL(SMTP_HOST, port, timeout=10, context=ctx)
-                else:
-                    server = smtplib.SMTP(SMTP_HOST, port, timeout=10)
-                    server.starttls(context=ctx)
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(SMTP_FROM, to_emails, msg.as_string())
-                server.quit()
-                return
-            except Exception:
-                if port == 587:
-                    raise
+        import urllib.request as _req
+        req = _req.Request(
+            "https://api.sendgrid.com/v3/mail/send",
+            data=payload.encode('utf-8'),
+            headers={
+                "Authorization": f"Bearer {SENDGRID_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            method="POST"
+        )
+        resp = _req.urlopen(req, timeout=15)
+        if resp.status not in (200, 201, 202):
+            logging.error(f"SendGrid returned {resp.status}: {resp.read().decode()}")
     try:
         await asyncio.to_thread(_send)
-    except smtplib.SMTPAuthenticationError:
-        logging.error("SMTP authentication failed – check SMTP_USER / SMTP_PASSWORD")
-    except smtplib.SMTPException as e:
-        logging.error(f"SMTP error: {e}")
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
