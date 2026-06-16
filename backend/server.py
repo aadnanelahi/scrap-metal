@@ -126,7 +126,7 @@ class Company(CompanyBase):
 class BranchBase(BaseModel):
     name: str
     code: str
-    company_id: str
+    company_id: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: str = "UAE"
@@ -142,7 +142,7 @@ class CustomerBase(BaseModel):
     name: str
     code: str
     type: TransactionType = TransactionType.LOCAL
-    company_id: str
+    company_id: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: str = "UAE"
@@ -163,7 +163,7 @@ class SupplierBase(BaseModel):
     name: str
     code: str
     type: TransactionType = TransactionType.LOCAL
-    company_id: str
+    company_id: Optional[str] = None
     address: Optional[str] = None
     city: Optional[str] = None
     country: str = "UAE"
@@ -182,7 +182,7 @@ class Supplier(SupplierBase):
 class BrokerBase(BaseModel):
     name: str
     code: str
-    company_id: str
+    company_id: Optional[str] = None
     commission_type: BrokerCommissionType = BrokerCommissionType.PER_MT
     commission_rate: float = 0
     phone: Optional[str] = None
@@ -331,7 +331,7 @@ class PurchaseOrderLineBase(BaseModel):
     line_total: float = 0
 
 class LocalPurchaseOrderBase(BaseModel):
-    company_id: str
+    company_id: Optional[str] = None
     branch_id: str
     supplier_id: str
     supplier_name: str
@@ -363,7 +363,7 @@ class LocalPurchaseOrder(LocalPurchaseOrderBase):
     edit_history: List[Dict] = []  # Track edits after posting
 
 class IntlPurchaseOrderBase(BaseModel):
-    company_id: str
+    company_id: Optional[str] = None
     branch_id: str
     supplier_id: str
     supplier_name: str
@@ -414,7 +414,7 @@ class SalesOrderLineBase(BaseModel):
     line_total: float = 0
 
 class LocalSalesOrderBase(BaseModel):
-    company_id: str
+    company_id: Optional[str] = None
     branch_id: str
     customer_id: str
     customer_name: str
@@ -446,7 +446,7 @@ class LocalSalesOrder(LocalSalesOrderBase):
     edit_history: List[Dict] = []
 
 class ExportSalesContractBase(BaseModel):
-    company_id: str
+    company_id: Optional[str] = None
     branch_id: str
     customer_id: str
     customer_name: str
