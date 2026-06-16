@@ -652,7 +652,10 @@ async def generate_number(prefix: str, collection: str, field: str = "order_numb
     return f"{prefix}-{year_month}-{str(count + 1).zfill(4)}"
 
 async def log_audit(user_id: str, user_email: str, action: str, entity_type: str, entity_id: str, 
-                   old_values: Dict = None, new_values: Dict = None, company_id: str = None):
+                   old_values: Dict = None, new_values: Dict = None, company_id: str = None,
+                   current_user: Dict = None):
+    if company_id is None and current_user:
+        company_id = current_user.get('company_id')
     audit = AuditLog(
         user_id=user_id,
         user_email=user_email,
@@ -983,7 +986,7 @@ async def crud_create(collection: str, item: BaseModel, current_user: Dict):
         doc['updated_at'] = doc['updated_at'].isoformat()
     
     await db[collection].insert_one(doc)
-    await log_audit(current_user['id'], current_user['email'], 'CREATE', collection, doc['id'])
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', collection, doc['id'], current_user=current_user)
     return {k: v for k, v in doc.items() if k != '_id'}
 
 async def crud_update(collection: str, item_id: str, data: Dict, current_user: Dict):
@@ -995,12 +998,12 @@ async def crud_update(collection: str, item_id: str, data: Dict, current_user: D
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    await log_audit(current_user['id'], current_user['email'], 'UPDATE', collection, item_id, new_values=data)
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', collection, item_id, new_values=data, current_user=current_user)
     return {"message": "Updated successfully"}
 
 async def crud_delete(collection: str, item_id: str, current_user: Dict):
     await db[collection].update_one({"id": item_id}, {"$set": {"is_active": False}})
-    await log_audit(current_user['id'], current_user['email'], 'DELETE', collection, item_id)
+    await log_audit(current_user['id'], current_user['email'], 'DELETE', collection, item_id, current_user=current_user)
     return {"message": "Deactivated successfully"}
 
 
@@ -1430,7 +1433,7 @@ async def create_weighbridge_entry(data: WeighbridgeEntryBase, current_user: Dic
         doc['first_weight_time'] = doc['first_weight_time'].isoformat()
     
     await db.weighbridge_entries.insert_one(doc)
-    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'weighbridge_entry', entry.id)
+    await log_audit(current_user['id'], current_user['email'], 'CREATE', 'weighbridge_entry', entry.id, current_user=current_user)
     return {k: v for k, v in doc.items() if k != '_id'}
 
 @api_router.put("/weighbridge-entries/{entry_id}/second-weight")
@@ -1453,7 +1456,7 @@ async def record_second_weight(entry_id: str, tare_weight: float, current_user: 
     }
     
     await db.weighbridge_entries.update_one({"id": entry_id}, {"$set": update_data})
-    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'weighbridge_entry', entry_id, new_values=update_data)
+    await log_audit(current_user['id'], current_user['email'], 'UPDATE', 'weighbridge_entry', entry_id, new_values=update_data, current_user=current_user)
     
     return {"message": "Second weight recorded", "net_weight": net_weight}
 
