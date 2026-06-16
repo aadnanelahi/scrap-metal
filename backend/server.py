@@ -745,7 +745,7 @@ async def login(credentials: UserLogin):
     if not user.get('is_active', True):
         raise HTTPException(status_code=401, detail="Account is inactive")
     
-    if not user.get('is_verified', False):
+    if not user.get('is_verified', False) and user.get('company_id'):
         raise HTTPException(status_code=403, detail="Email not verified. Please check your inbox or request a new verification link.")
     
     token = create_token(user['id'], user['email'], user['role'], company_id=user.get('company_id'))
