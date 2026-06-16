@@ -788,6 +788,30 @@ async def resend_verification(email: str = Query(...)):
     await send_email([user['email']], "Verify your ScrapOS email", body)
     return {"message": "Verification email sent"}
 
+@api_router.post("/auth/admin/verify-user")
+async def admin_verify_user(email: str = Query(...), current_user: Dict = Depends(get_current_user)):
+    """Admin-only: mark a user as verified. Super admins can verify any user;
+    company admins can only verify users in their own company."""
+    if current_user.get('role') not in ['admin', 'super_admin']:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Company admin can only verify users in their own company
+    caller_company = current_user.get('company_id')
+    if caller_company and user.get('company_id') != caller_company:
+        raise HTTPException(status_code=403, detail="Cannot modify users from another company")
+    
+    await db.users.update_one(
+        {"id": user['id']},
+        {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
+    )
+    await log_audit(current_user['id'], current_user['email'], 'ADMIN_VERIFY', 'user', user['id'],
+                    new_values={"email": email}, current_user=current_user)
+    return {"message": f"User {email} verified successfully"}
+
 @api_router.get("/auth/me")
 async def get_me(current_user: Dict = Depends(get_current_user)):
     return current_user
