@@ -55,13 +55,21 @@ async def send_email(to_emails: List[str], subject: str, html_body: str):
         msg['To'] = ', '.join(to_emails)
         msg.attach(MIMEText(html_body, 'html'))
         ctx = ssl.create_default_context()
-        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
-        try:
-            server.starttls(context=ctx)
-            server.login(SMTP_USER, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM, to_emails, msg.as_string())
-        finally:
-            server.quit()
+        # Try port 465 (SSL) first, fallback to 587 (STARTTLS)
+        for port in [465, 587]:
+            try:
+                if port == 465:
+                    server = smtplib.SMTP_SSL(SMTP_HOST, port, timeout=10, context=ctx)
+                else:
+                    server = smtplib.SMTP(SMTP_HOST, port, timeout=10)
+                    server.starttls(context=ctx)
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_FROM, to_emails, msg.as_string())
+                server.quit()
+                return
+            except Exception:
+                if port == 587:
+                    raise
     try:
         await asyncio.to_thread(_send)
     except smtplib.SMTPAuthenticationError:
