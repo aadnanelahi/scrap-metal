@@ -118,6 +118,7 @@ class UserBase(BaseModel):
     company_id: Optional[str] = None
     branch_id: Optional[str] = None
     is_active: bool = True
+    is_verified: bool = False
 
 class UserCreate(UserBase):
     password: str
@@ -125,6 +126,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    verification_token: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -674,6 +676,7 @@ async def register(user_data: CompanyRegistration):
     
     user_data_dict = user_data.model_dump(exclude={"password", "company_name"})
     user_data_dict['company_id'] = company.id
+    user_data_dict['verification_token'] = str(uuid.uuid4())
     user = User(**user_data_dict)
     doc = user.model_dump()
     doc['password_hash'] = hash_password(user_data.password)
@@ -685,7 +688,8 @@ async def register(user_data: CompanyRegistration):
     token = create_token(user.id, user.email, user.role, company_id=company.id)
     user_dict = {k: v for k, v in doc.items() if k not in ['_id', 'password_hash']}
     
-    # Send registration confirmation emails
+    # Send registration confirmation + verification emails
+    verify_link = f"https://scrapos.online/verify-email?token={user.verification_token}"
     subject = f"Welcome to ScrapOS – {company_name}"
     body = f"""
     <h2>Registration Confirmed</h2>
@@ -693,13 +697,25 @@ async def register(user_data: CompanyRegistration):
     <p><strong>Email:</strong> {user.email}</p>
     <p><strong>Company:</strong> {company_name}</p>
     <p><strong>Role:</strong> {user.role}</p>
-    <p><strong>Registered:</strong> {user.created_at.strftime('%Y-%m-%d %H:%M UTC')}</p>
     <hr>
-    <p>You can now log in at <a href="https://scrapos.online">scrapos.online</a></p>
+    <p>Please verify your email address by clicking the link below:</p>
+    <p><a href="{verify_link}" style="display:inline-block;padding:12px 24px;background:#f97316;color:#fff;text-decoration:none;border-radius:6px">Verify Email</a></p>
+    <p>Or copy this link: <a href="{verify_link}">{verify_link}</a></p>
+    <hr>
+    <p>You can log in at <a href="https://scrapos.online">scrapos.online</a> after verifying.</p>
+    """
+    admin_subject = f"[New Registration] {company_name} – {user.email}"
+    admin_body = f"""
+    <h2>New Company Registered</h2>
+    <p><strong>Name:</strong> {user.full_name}</p>
+    <p><strong>Email:</strong> {user.email}</p>
+    <p><strong>Company:</strong> {company_name}</p>
+    <p><strong>Role:</strong> {user.role}</p>
+    <p><strong>Verified:</strong> Pending</p>
     """
     await asyncio.gather(
         send_email([user.email], subject, body),
-        send_email([SUPER_ADMIN_EMAIL], f"[New Registration] {company_name}", body)
+        send_email([SUPER_ADMIN_EMAIL], admin_subject, admin_body)
     )
     
     return Token(access_token=token, user=user_dict)
@@ -713,9 +729,41 @@ async def login(credentials: UserLogin):
     if not user.get('is_active', True):
         raise HTTPException(status_code=401, detail="Account is inactive")
     
+    if not user.get('is_verified', False):
+        raise HTTPException(status_code=403, detail="Email not verified. Please check your inbox or request a new verification link.")
+    
     token = create_token(user['id'], user['email'], user['role'], company_id=user.get('company_id'))
     user_dict = {k: v for k, v in user.items() if k != 'password_hash'}
     return Token(access_token=token, user=user_dict)
+
+@api_router.get("/auth/verify-email")
+async def verify_email(token: str = Query(...)):
+    user = await db.users.find_one({"verification_token": token, "is_verified": False}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification link")
+    await db.users.update_one(
+        {"id": user['id']},
+        {"$set": {"is_verified": True}, "$unset": {"verification_token": ""}}
+    )
+    await log_audit(user['id'], user['email'], 'VERIFY_EMAIL', 'user', user['id'])
+    return {"message": "Email verified successfully. You can now log in."}
+
+@api_router.post("/auth/resend-verification")
+async def resend_verification(email: str = Query(...)):
+    user = await db.users.find_one({"email": email, "is_verified": False}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=400, detail="No unverified account found with this email")
+    new_token = str(uuid.uuid4())
+    await db.users.update_one({"id": user['id']}, {"$set": {"verification_token": new_token}})
+    verify_link = f"https://scrapos.online/verify-email?token={new_token}"
+    body = f"""
+    <h2>Email Verification</h2>
+    <p>Click the link to verify your email:</p>
+    <p><a href="{verify_link}" style="display:inline-block;padding:12px 24px;background:#f97316;color:#fff;text-decoration:none;border-radius:6px">Verify Email</a></p>
+    <p>Or copy: <a href="{verify_link}">{verify_link}</a></p>
+    """
+    await send_email([user['email']], "Verify your ScrapOS email", body)
+    return {"message": "Verification email sent"}
 
 @api_router.get("/auth/me")
 async def get_me(current_user: Dict = Depends(get_current_user)):
@@ -768,6 +816,7 @@ async def create_user(user_data: UserCreate, current_user: Dict = Depends(get_cu
     
     user_data_dict = user_data.model_dump(exclude={"password"})
     user_data_dict['company_id'] = company_id
+    user_data_dict['verification_token'] = str(uuid.uuid4())
     user = User(**user_data_dict)
     doc = user.model_dump()
     doc['password_hash'] = hash_password(user_data.password)
@@ -776,6 +825,22 @@ async def create_user(user_data: UserCreate, current_user: Dict = Depends(get_cu
     
     await db.users.insert_one(doc)
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'user', user.id, new_values={"email": user.email})
+    
+    # Send verification email to the new user
+    verify_link = f"https://scrapos.online/verify-email?token={user.verification_token}"
+    await send_email(
+        [user.email],
+        "Welcome to ScrapOS – Please verify your email",
+        f"""
+        <h2>Account Created</h2>
+        <p><strong>Name:</strong> {user.full_name}</p>
+        <p><strong>Email:</strong> {user.email}</p>
+        <p><strong>Company:</strong> {company_name}</p>
+        <hr>
+        <p>Click to verify your email:</p>
+        <p><a href="{verify_link}" style="display:inline-block;padding:12px 24px;background:#f97316;color:#fff;text-decoration:none;border-radius:6px">Verify Email</a></p>
+        """
+    )
     
     # Notify admin and super admin about new user
     company = await db.companies.find_one({"id": company_id}, {"_id": 0}) if company_id else None

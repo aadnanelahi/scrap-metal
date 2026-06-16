@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 // Auth Pages
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
 // Main Pages
 import DashboardPage from './pages/DashboardPage';
@@ -114,6 +115,7 @@ function AppRoutes() {
       {/* Public Routes */}
       <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
 
       {/* Protected Routes */}
       <Route path="/" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
