@@ -49,18 +49,25 @@ async def send_email(to_emails: List[str], subject: str, html_body: str):
         logging.warning("SMTP not configured – skipping email")
         return
     def _send():
-        msg = MIMEMultipart('alternative')
+        msg = MIMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = SMTP_FROM
         msg['To'] = ', '.join(to_emails)
         msg.attach(MIMEText(html_body, 'html'))
         ctx = ssl.create_default_context()
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=10)
+        try:
             server.starttls(context=ctx)
             server.login(SMTP_USER, SMTP_PASSWORD)
             server.sendmail(SMTP_FROM, to_emails, msg.as_string())
+        finally:
+            server.quit()
     try:
         await asyncio.to_thread(_send)
+    except smtplib.SMTPAuthenticationError:
+        logging.error("SMTP authentication failed – check SMTP_USER / SMTP_PASSWORD")
+    except smtplib.SMTPException as e:
+        logging.error(f"SMTP error: {e}")
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
