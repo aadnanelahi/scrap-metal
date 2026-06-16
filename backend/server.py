@@ -92,6 +92,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class CompanyRegistration(UserCreate):
+    company_name: Optional[str] = None
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -557,14 +560,23 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
 
-def create_token(user_id: str, email: str, role: str) -> str:
+def create_token(user_id: str, email: str, role: str, company_id: Optional[str] = None) -> str:
     payload = {
         "user_id": user_id,
         "email": email,
         "role": role,
+        "company_id": company_id,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+async def get_current_company_id(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[str]:
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload.get("company_id")
+    except Exception:
+        return None
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
     try:
@@ -602,12 +614,27 @@ async def log_audit(user_id: str, user_email: str, action: str, entity_type: str
 
 # ==================== AUTH ROUTES ====================
 @api_router.post("/auth/register", response_model=Token)
-async def register(user_data: UserCreate):
+async def register(user_data: CompanyRegistration):
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    user = User(**user_data.model_dump(exclude={"password"}))
+    company_name = user_data.company_name or f"{user_data.full_name}'s Company"
+    
+    company = Company(
+        name=company_name,
+        code=company_name[:3].upper() + str(uuid.uuid4())[:4].upper(),
+        country="UAE",
+        currency="AED",
+        is_active=True
+    )
+    company_doc = company.model_dump()
+    company_doc['created_at'] = company_doc['created_at'].isoformat()
+    await db.companies.insert_one(company_doc)
+    
+    user_data_dict = user_data.model_dump(exclude={"password", "company_name"})
+    user_data_dict['company_id'] = company.id
+    user = User(**user_data_dict)
     doc = user.model_dump()
     doc['password_hash'] = hash_password(user_data.password)
     doc['created_at'] = doc['created_at'].isoformat()
@@ -615,7 +642,7 @@ async def register(user_data: UserCreate):
     
     await db.users.insert_one(doc)
     
-    token = create_token(user.id, user.email, user.role)
+    token = create_token(user.id, user.email, user.role, company_id=company.id)
     user_dict = {k: v for k, v in doc.items() if k not in ['_id', 'password_hash']}
     return Token(access_token=token, user=user_dict)
 
@@ -628,7 +655,7 @@ async def login(credentials: UserLogin):
     if not user.get('is_active', True):
         raise HTTPException(status_code=401, detail="Account is inactive")
     
-    token = create_token(user['id'], user['email'], user['role'])
+    token = create_token(user['id'], user['email'], user['role'], company_id=user.get('company_id'))
     user_dict = {k: v for k, v in user.items() if k != 'password_hash'}
     return Token(access_token=token, user=user_dict)
 
@@ -647,13 +674,26 @@ async def change_password(data: PasswordChange, current_user: Dict = Depends(get
     return {"message": "Password changed successfully"}
 
 # ==================== USERS MANAGEMENT ====================
+MAX_USERS_PER_COMPANY = 5
+
+async def enforce_company_user_limit(company_id: Optional[str]):
+    if company_id:
+        count = await db.users.count_documents({"company_id": company_id, "is_active": True})
+        if count >= MAX_USERS_PER_COMPANY:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Company user limit reached ({MAX_USERS_PER_COMPANY} users maximum). Upgrade your plan to add more users."
+            )
+
 @api_router.get("/users", response_model=List[Dict])
 async def list_users(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     current_user: Dict = Depends(get_current_user)
 ):
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
+    company_id = current_user.get('company_id')
+    query = {"company_id": company_id} if company_id else {}
+    users = await db.users.find(query, {"_id": 0, "password_hash": 0}).skip(skip).limit(limit).to_list(limit)
     return users
 
 @api_router.post("/users", response_model=Dict)
@@ -661,11 +701,16 @@ async def create_user(user_data: UserCreate, current_user: Dict = Depends(get_cu
     if current_user['role'] not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Not authorized")
     
+    company_id = current_user.get('company_id')
+    await enforce_company_user_limit(company_id)
+    
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already exists")
     
-    user = User(**user_data.model_dump(exclude={"password"}))
+    user_data_dict = user_data.model_dump(exclude={"password"})
+    user_data_dict['company_id'] = company_id
+    user = User(**user_data_dict)
     doc = user.model_dump()
     doc['password_hash'] = hash_password(user_data.password)
     doc['created_at'] = doc['created_at'].isoformat()
@@ -681,8 +726,16 @@ async def update_user(user_id: str, user_data: Dict, current_user: Dict = Depend
     if current_user['role'] not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Not authorized")
     
+    company_id = current_user.get('company_id')
+    target_user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if company_id and target_user.get('company_id') != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access users from other companies")
+    
     user_data.pop('password', None)
     user_data.pop('password_hash', None)
+    user_data.pop('company_id', None)
     user_data['updated_at'] = datetime.now(timezone.utc).isoformat()
     
     result = await db.users.update_one({"id": user_id}, {"$set": user_data})
@@ -697,6 +750,13 @@ async def delete_user(user_id: str, current_user: Dict = Depends(get_current_use
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Not authorized")
     
+    company_id = current_user.get('company_id')
+    target_user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if company_id and target_user.get('company_id') != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access users from other companies")
+    
     await db.users.update_one({"id": user_id}, {"$set": {"is_active": False}})
     await log_audit(current_user['id'], current_user['email'], 'DELETE', 'user', user_id)
     return {"message": "User deactivated"}
@@ -707,6 +767,8 @@ async def delete_user_permanent(user_id: str, current_user: Dict = Depends(get_c
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Not authorized")
     
+    company_id = current_user.get('company_id')
+    
     # Prevent admin from deleting themselves
     if user_id == current_user['id']:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
@@ -714,6 +776,8 @@ async def delete_user_permanent(user_id: str, current_user: Dict = Depends(get_c
     user = await db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if company_id and user.get('company_id') != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access users from other companies")
     
     await db.users.delete_one({"id": user_id})
     await log_audit(current_user['id'], current_user['email'], 'PERMANENT_DELETE', 'user', user_id, old_values=user)
@@ -724,6 +788,13 @@ async def admin_reset_password(user_id: str, data: Dict, current_user: Dict = De
     """Admin can reset any user's password"""
     if current_user['role'] != 'admin':
         raise HTTPException(status_code=403, detail="Not authorized")
+    
+    company_id = current_user.get('company_id')
+    user = await db.users.find_one({"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if company_id and user.get('company_id') != company_id:
+        raise HTTPException(status_code=403, detail="Cannot access users from other companies")
     
     new_password = data.get('new_password')
     if not new_password or len(new_password) < 6:
@@ -778,32 +849,79 @@ async def crud_delete(collection: str, item_id: str, current_user: Dict):
     await log_audit(current_user['id'], current_user['email'], 'DELETE', collection, item_id)
     return {"message": "Deactivated successfully"}
 
+
+# ==================== TENANT ISOLATION HELPERS ====================
+def tenant_filter(current_user: Dict, extra_filters: Dict = None) -> Dict:
+    """Build a MongoDB filter dict that scopes queries to the user's company."""
+    filters = extra_filters or {}
+    company_id = current_user.get('company_id')
+    if company_id:
+        filters['company_id'] = company_id
+    return filters
+
+async def verify_tenant_access(collection: str, item_id: str, current_user: Dict):
+    """Verify that an item belongs to the current user's company."""
+    company_id = current_user.get('company_id')
+    if not company_id:
+        return
+    item = await db[collection].find_one({"id": item_id}, {"_id": 0, "company_id": 1})
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.get('company_id') and item['company_id'] != company_id:
+        raise HTTPException(status_code=403, detail="Access denied: data belongs to another company")
+
+async def tenant_upsert(collection: str, item_id: str, data: Dict, current_user: Dict):
+    """Update an item after verifying tenant access."""
+    await verify_tenant_access(collection, item_id, current_user)
+    return await crud_update(collection, item_id, data, current_user)
+
+async def tenant_delete(collection: str, item_id: str, current_user: Dict):
+    """Soft delete an item after verifying tenant access."""
+    await verify_tenant_access(collection, item_id, current_user)
+    return await crud_delete(collection, item_id, current_user)
+
 # ==================== COMPANIES ====================
 @api_router.get("/companies", response_model=List[Dict])
 async def list_companies(current_user: Dict = Depends(get_current_user)):
+    company_id = current_user.get('company_id')
+    if company_id:
+        company = await db.companies.find_one({"id": company_id}, {"_id": 0})
+        return [company] if company else []
     return await crud_list("companies")
 
 @api_router.get("/companies/{company_id}")
 async def get_company(company_id: str, current_user: Dict = Depends(get_current_user)):
+    user_company_id = current_user.get('company_id')
+    if user_company_id and company_id != user_company_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     return await crud_get("companies", company_id)
 
 @api_router.post("/companies")
 async def create_company(data: CompanyBase, current_user: Dict = Depends(get_current_user)):
-    company = Company(**data.model_dump())
-    return await crud_create("companies", company, current_user)
+    raise HTTPException(status_code=403, detail="Companies are auto-created during registration. Contact support for custom setups.")
 
 @api_router.put("/companies/{company_id}")
 async def update_company(company_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    user_company_id = current_user.get('company_id')
+    if user_company_id and company_id != user_company_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     return await crud_update("companies", company_id, data, current_user)
 
 @api_router.delete("/companies/{company_id}")
 async def delete_company(company_id: str, current_user: Dict = Depends(get_current_user)):
+    user_company_id = current_user.get('company_id')
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if user_company_id and company_id != user_company_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     return await crud_delete("companies", company_id, current_user)
 
 # ==================== BRANCHES ====================
 @api_router.get("/branches", response_model=List[Dict])
 async def list_branches(company_id: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
-    filters = {"company_id": company_id} if company_id else {}
+    user_company = current_user.get('company_id')
+    effective_company = user_company or company_id
+    filters = {"company_id": effective_company} if effective_company else {}
     return await crud_list("branches", filters)
 
 @api_router.get("/branches/{branch_id}")
@@ -812,84 +930,104 @@ async def get_branch(branch_id: str, current_user: Dict = Depends(get_current_us
 
 @api_router.post("/branches")
 async def create_branch(data: BranchBase, current_user: Dict = Depends(get_current_user)):
-    branch = Branch(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    branch = Branch(**data_dict)
     return await crud_create("branches", branch, current_user)
 
 @api_router.put("/branches/{branch_id}")
 async def update_branch(branch_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("branches", branch_id, data, current_user)
+    return await tenant_upsert("branches", branch_id, data, current_user)
 
 @api_router.delete("/branches/{branch_id}")
 async def delete_branch(branch_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("branches", branch_id, current_user)
+    return await tenant_delete("branches", branch_id, current_user)
 
 # ==================== CUSTOMERS ====================
 @api_router.get("/customers", response_model=List[Dict])
 async def list_customers(type: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
-    filters = {"type": type} if type else {}
+    filters = tenant_filter(current_user, {"type": type} if type else {})
     return await crud_list("customers", filters)
 
 @api_router.get("/customers/{customer_id}")
 async def get_customer(customer_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("customers", customer_id, current_user)
     return await crud_get("customers", customer_id)
 
 @api_router.post("/customers")
 async def create_customer(data: CustomerBase, current_user: Dict = Depends(get_current_user)):
-    customer = Customer(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    customer = Customer(**data_dict)
     return await crud_create("customers", customer, current_user)
 
 @api_router.put("/customers/{customer_id}")
 async def update_customer(customer_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("customers", customer_id, data, current_user)
+    return await tenant_upsert("customers", customer_id, data, current_user)
 
 @api_router.delete("/customers/{customer_id}")
 async def delete_customer(customer_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("customers", customer_id, current_user)
+    return await tenant_delete("customers", customer_id, current_user)
 
 # ==================== SUPPLIERS ====================
 @api_router.get("/suppliers", response_model=List[Dict])
 async def list_suppliers(type: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
-    filters = {"type": type} if type else {}
+    filters = tenant_filter(current_user, {"type": type} if type else {})
     return await crud_list("suppliers", filters)
 
 @api_router.get("/suppliers/{supplier_id}")
 async def get_supplier(supplier_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("suppliers", supplier_id, current_user)
     return await crud_get("suppliers", supplier_id)
 
 @api_router.post("/suppliers")
 async def create_supplier(data: SupplierBase, current_user: Dict = Depends(get_current_user)):
-    supplier = Supplier(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    supplier = Supplier(**data_dict)
     return await crud_create("suppliers", supplier, current_user)
 
 @api_router.put("/suppliers/{supplier_id}")
 async def update_supplier(supplier_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("suppliers", supplier_id, data, current_user)
+    return await tenant_upsert("suppliers", supplier_id, data, current_user)
 
 @api_router.delete("/suppliers/{supplier_id}")
 async def delete_supplier(supplier_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("suppliers", supplier_id, current_user)
+    return await tenant_delete("suppliers", supplier_id, current_user)
 
 # ==================== BROKERS ====================
 @api_router.get("/brokers", response_model=List[Dict])
 async def list_brokers(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("brokers")
+    filters = tenant_filter(current_user)
+    return await crud_list("brokers", filters)
 
 @api_router.get("/brokers/{broker_id}")
 async def get_broker(broker_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("brokers", broker_id, current_user)
     return await crud_get("brokers", broker_id)
 
 @api_router.post("/brokers")
 async def create_broker(data: BrokerBase, current_user: Dict = Depends(get_current_user)):
-    broker = Broker(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    broker = Broker(**data_dict)
     return await crud_create("brokers", broker, current_user)
 
 @api_router.put("/brokers/{broker_id}")
 async def update_broker(broker_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("brokers", broker_id, data, current_user)
+    return await tenant_upsert("brokers", broker_id, data, current_user)
 
 @api_router.delete("/brokers/{broker_id}")
 async def delete_broker(broker_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("brokers", broker_id, current_user)
+    return await tenant_delete("brokers", broker_id, current_user)
 
 # ==================== SCRAP CATEGORIES ====================
 @api_router.get("/scrap-categories", response_model=List[Dict])
@@ -1093,7 +1231,7 @@ async def list_local_purchases(
     supplier_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if status:
         filters['status'] = status
     if supplier_id:
@@ -1102,6 +1240,7 @@ async def list_local_purchases(
 
 @api_router.get("/local-purchases/{po_id}")
 async def get_local_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_purchases", po_id, current_user)
     return await crud_get("local_purchases", po_id)
 
 @api_router.post("/local-purchases")
@@ -1109,6 +1248,9 @@ async def create_local_purchase(data: LocalPurchaseOrderBase, current_user: Dict
     po = LocalPurchaseOrder(**data.model_dump())
     po.order_number = await generate_number("LPO", "local_purchases")
     po.created_by = current_user['id']
+    company_id = current_user.get('company_id')
+    if company_id:
+        po.company_id = company_id
     
     # Calculate totals
     subtotal = sum(line.quantity * line.unit_price for line in data.lines)
@@ -1136,6 +1278,7 @@ async def create_local_purchase(data: LocalPurchaseOrderBase, current_user: Dict
 
 @api_router.put("/local-purchases/{po_id}")
 async def update_local_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_purchases", po_id, current_user)
     existing = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1167,6 +1310,7 @@ async def post_local_purchase(po_id: str, current_user: Dict = Depends(get_curre
     if current_user.get('role') not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Only managers can post documents")
     
+    await verify_tenant_access("local_purchases", po_id, current_user)
     po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1213,6 +1357,7 @@ async def cancel_local_purchase(po_id: str, data: Dict, current_user: Dict = Dep
     if not data.get('cancellation_reason'):
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
     
+    await verify_tenant_access("local_purchases", po_id, current_user)
     po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1239,6 +1384,7 @@ async def delete_local_purchase(po_id: str, current_user: Dict = Depends(get_cur
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
     
+    await verify_tenant_access("local_purchases", po_id, current_user)
     po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1274,7 +1420,7 @@ async def list_intl_purchases(
     supplier_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if status:
         filters['status'] = status
     if supplier_id:
@@ -1283,6 +1429,7 @@ async def list_intl_purchases(
 
 @api_router.get("/intl-purchases/{po_id}")
 async def get_intl_purchase(po_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("intl_purchases", po_id, current_user)
     return await crud_get("intl_purchases", po_id)
 
 @api_router.post("/intl-purchases")
@@ -1290,6 +1437,9 @@ async def create_intl_purchase(data: IntlPurchaseOrderBase, current_user: Dict =
     po = IntlPurchaseOrder(**data.model_dump())
     po.order_number = await generate_number("IPO", "intl_purchases")
     po.created_by = current_user['id']
+    company_id = current_user.get('company_id')
+    if company_id:
+        po.company_id = company_id
     
     # Calculate totals
     subtotal = sum(line.quantity * line.unit_price for line in data.lines)
@@ -1309,6 +1459,7 @@ async def create_intl_purchase(data: IntlPurchaseOrderBase, current_user: Dict =
 
 @api_router.put("/intl-purchases/{po_id}")
 async def update_intl_purchase(po_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("intl_purchases", po_id, current_user)
     existing = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1336,6 +1487,7 @@ async def post_intl_purchase(po_id: str, current_user: Dict = Depends(get_curren
     if current_user.get('role') not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Only managers can post documents")
     
+    await verify_tenant_access("intl_purchases", po_id, current_user)
     po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1385,6 +1537,7 @@ async def cancel_intl_purchase(po_id: str, data: Dict, current_user: Dict = Depe
     if not data.get('cancellation_reason'):
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
     
+    await verify_tenant_access("intl_purchases", po_id, current_user)
     po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1411,6 +1564,7 @@ async def delete_intl_purchase(po_id: str, current_user: Dict = Depends(get_curr
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
     
+    await verify_tenant_access("intl_purchases", po_id, current_user)
     po = await db.intl_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -1444,7 +1598,7 @@ async def list_local_sales(
     customer_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if status:
         filters['status'] = status
     if customer_id:
@@ -1453,6 +1607,7 @@ async def list_local_sales(
 
 @api_router.get("/local-sales/{so_id}")
 async def get_local_sale(so_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_sales", so_id, current_user)
     return await crud_get("local_sales", so_id)
 
 @api_router.post("/local-sales")
@@ -1460,6 +1615,9 @@ async def create_local_sale(data: LocalSalesOrderBase, current_user: Dict = Depe
     so = LocalSalesOrder(**data.model_dump())
     so.order_number = await generate_number("LSO", "local_sales")
     so.created_by = current_user['id']
+    company_id = current_user.get('company_id')
+    if company_id:
+        so.company_id = company_id
     
     # Calculate totals
     subtotal = sum(line.quantity * line.unit_price for line in data.lines)
@@ -1487,6 +1645,7 @@ async def create_local_sale(data: LocalSalesOrderBase, current_user: Dict = Depe
 
 @api_router.put("/local-sales/{so_id}")
 async def update_local_sale(so_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_sales", so_id, current_user)
     existing = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -1514,6 +1673,7 @@ async def post_local_sale(so_id: str, current_user: Dict = Depends(get_current_u
     if current_user.get('role') not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Only managers can post documents")
     
+    await verify_tenant_access("local_sales", so_id, current_user)
     so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not so:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -1572,6 +1732,7 @@ async def cancel_local_sale(so_id: str, data: Dict, current_user: Dict = Depends
     if not data.get('cancellation_reason'):
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
     
+    await verify_tenant_access("local_sales", so_id, current_user)
     so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not so:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -1598,6 +1759,7 @@ async def delete_local_sale(so_id: str, current_user: Dict = Depends(get_current
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
     
+    await verify_tenant_access("local_sales", so_id, current_user)
     so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not so:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -1631,7 +1793,7 @@ async def list_export_sales(
     customer_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if status:
         filters['status'] = status
     if customer_id:
@@ -1640,6 +1802,7 @@ async def list_export_sales(
 
 @api_router.get("/export-sales/{contract_id}")
 async def get_export_sale(contract_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("export_sales", contract_id, current_user)
     return await crud_get("export_sales", contract_id)
 
 @api_router.post("/export-sales")
@@ -1647,6 +1810,9 @@ async def create_export_sale(data: ExportSalesContractBase, current_user: Dict =
     contract = ExportSalesContract(**data.model_dump())
     contract.contract_number = await generate_number("EXP", "export_sales", "contract_number")
     contract.created_by = current_user['id']
+    company_id = current_user.get('company_id')
+    if company_id:
+        contract.company_id = company_id
     
     # Calculate totals (zero-rated VAT for exports)
     subtotal = sum(line.quantity * line.unit_price for line in data.lines)
@@ -1664,6 +1830,7 @@ async def create_export_sale(data: ExportSalesContractBase, current_user: Dict =
 
 @api_router.put("/export-sales/{contract_id}")
 async def update_export_sale(contract_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("export_sales", contract_id, current_user)
     existing = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
     if not existing:
         raise HTTPException(status_code=404, detail="Export contract not found")
@@ -1691,6 +1858,7 @@ async def post_export_sale(contract_id: str, current_user: Dict = Depends(get_cu
     if current_user.get('role') not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Only managers can post documents")
     
+    await verify_tenant_access("export_sales", contract_id, current_user)
     contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
     if not contract:
         raise HTTPException(status_code=404, detail="Export contract not found")
@@ -1749,6 +1917,7 @@ async def cancel_export_sale(contract_id: str, data: Dict, current_user: Dict = 
     if not data.get('cancellation_reason'):
         raise HTTPException(status_code=400, detail="Cancellation reason is required")
     
+    await verify_tenant_access("export_sales", contract_id, current_user)
     contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
     if not contract:
         raise HTTPException(status_code=404, detail="Export contract not found")
@@ -1775,6 +1944,7 @@ async def delete_export_sale(contract_id: str, current_user: Dict = Depends(get_
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete documents permanently")
     
+    await verify_tenant_access("export_sales", contract_id, current_user)
     contract = await db.export_sales.find_one({"id": contract_id}, {"_id": 0})
     if not contract:
         raise HTTPException(status_code=404, detail="Export contract not found")
@@ -2265,6 +2435,8 @@ async def get_dashboard_kpis(
     end_date: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
+    company_id = current_user.get('company_id')
+    
     # Build date filter
     date_filter = {}
     if start_date:
@@ -2274,13 +2446,22 @@ async def get_dashboard_kpis(
     
     # Purchase filters
     purchase_filter = {"status": "posted"}
+    if company_id:
+        purchase_filter["company_id"] = company_id
     if date_filter:
         purchase_filter["order_date"] = date_filter
     
     # Sales filters  
     sales_filter = {"status": "posted"}
+    if company_id:
+        sales_filter["company_id"] = company_id
     if date_filter:
         sales_filter["order_date"] = date_filter
+    
+    # Inventory filter
+    inventory_filter = {}
+    if company_id:
+        inventory_filter["company_id"] = company_id
     
     # Total purchases using aggregation (local + intl)
     local_purchase_agg = await db.local_purchases.aggregate([
@@ -2314,6 +2495,7 @@ async def get_dashboard_kpis(
     
     # Total inventory value using aggregation (not filtered by date - current snapshot)
     inventory_agg = await db.inventory_stock.aggregate([
+        {"$match": inventory_filter},
         {"$group": {"_id": None, "total_value": {"$sum": "$total_value"}, "total_qty": {"$sum": "$quantity"}}}
     ]).to_list(1)
     inventory_value = inventory_agg[0]["total_value"] if inventory_agg else 0
@@ -2324,13 +2506,18 @@ async def get_dashboard_kpis(
     margin_percentage = (gross_margin / total_sales * 100) if total_sales > 0 else 0
     
     # Pending documents (not filtered by date)
-    pending_local_po = await db.local_purchases.count_documents({"status": {"$in": ["draft", "pending"]}})
-    pending_intl_po = await db.intl_purchases.count_documents({"status": {"$in": ["draft", "pending"]}})
-    pending_local_so = await db.local_sales.count_documents({"status": {"$in": ["draft", "pending"]}})
-    pending_export = await db.export_sales.count_documents({"status": {"$in": ["draft", "pending"]}})
+    pending_filter = {"status": {"$in": ["draft", "pending"]}}
+    if company_id:
+        pending_filter["company_id"] = company_id
+    pending_local_po = await db.local_purchases.count_documents(pending_filter)
+    pending_intl_po = await db.intl_purchases.count_documents(pending_filter)
+    pending_local_so = await db.local_sales.count_documents(pending_filter)
+    pending_export = await db.export_sales.count_documents(pending_filter)
     
     # Weighbridge entries for period
     wb_filter = {}
+    if company_id:
+        wb_filter["company_id"] = company_id
     if start_date and end_date:
         wb_filter["created_at"] = {"$gte": start_date, "$lte": end_date + "T23:59:59"}
     elif start_date:
@@ -2372,7 +2559,8 @@ async def purchase_register(
     current_user: Dict = Depends(get_current_user)
 ):
     collection = "local_purchases" if type == "local" else "intl_purchases"
-    filters = {"status": "posted"}
+    filters = tenant_filter(current_user)
+    filters["status"] = "posted"
     
     if start_date:
         filters['order_date'] = {"$gte": start_date}
@@ -2406,7 +2594,8 @@ async def sales_register(
 ):
     collection = "local_sales" if type == "local" else "export_sales"
     date_field = "order_date" if type == "local" else "contract_date"
-    filters = {"status": "posted"}
+    filters = tenant_filter(current_user)
+    filters["status"] = "posted"
     
     if start_date:
         filters[date_field] = {"$gte": start_date}
@@ -2438,8 +2627,11 @@ async def vat_report(
     end_date: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
+    company_filter = tenant_filter(current_user)
+    
     # Input VAT from local purchases
     lp_filters = {"status": "posted"}
+    lp_filters.update(company_filter)
     if start_date:
         lp_filters['order_date'] = {"$gte": start_date}
     if end_date:
@@ -2454,6 +2646,7 @@ async def vat_report(
     
     # Output VAT from local sales
     ls_filters = {"status": "posted"}
+    ls_filters.update(company_filter)
     if start_date:
         ls_filters['order_date'] = {"$gte": start_date}
     if end_date:
@@ -2468,6 +2661,7 @@ async def vat_report(
     
     # Zero-rated exports
     exp_filters = {"status": "posted"}
+    exp_filters.update(company_filter)
     if start_date:
         exp_filters['contract_date'] = {"$gte": start_date}
     if end_date:
@@ -2497,7 +2691,9 @@ async def vat_report(
 
 @api_router.get("/reports/stock-aging")
 async def stock_aging(current_user: Dict = Depends(get_current_user)):
-    stock = await db.inventory_stock.find({}, {"_id": 0}).to_list(1000)
+    stock = await db.inventory_stock.find(
+        tenant_filter(current_user), {"_id": 0}
+    ).to_list(1000)
     
     aging_data = []
     for item in stock:
@@ -2521,11 +2717,14 @@ async def broker_commission_report(
     end_date: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
+    company_filter = tenant_filter(current_user)
+    
     # Gather all broker commissions from purchases and sales
     commissions = []
     
     # Local purchases
     lp_filters = {"status": "posted", "broker_id": {"$ne": None}}
+    lp_filters.update(company_filter)
     if broker_id:
         lp_filters['broker_id'] = broker_id
     
@@ -2542,6 +2741,7 @@ async def broker_commission_report(
     
     # Local sales
     ls_filters = {"status": "posted", "broker_id": {"$ne": None}}
+    ls_filters.update(company_filter)
     if broker_id:
         ls_filters['broker_id'] = broker_id
     
@@ -2571,6 +2771,7 @@ async def customer_ledger(
     end_date: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
+    await verify_tenant_access("customers", customer_id, current_user)
     customer = await db.customers.find_one({"id": customer_id}, {"_id": 0})
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -2580,6 +2781,9 @@ async def customer_ledger(
     
     # Get all sales (debits to customer)
     sales_filters = {"customer_id": customer_id, "status": "posted"}
+    company_id = current_user.get('company_id')
+    if company_id:
+        sales_filters["company_id"] = company_id
     if start_date:
         sales_filters['order_date'] = {"$gte": start_date}
     if end_date:
@@ -2648,6 +2852,7 @@ async def supplier_ledger(
     end_date: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
+    await verify_tenant_access("suppliers", supplier_id, current_user)
     supplier = await db.suppliers.find_one({"id": supplier_id}, {"_id": 0})
     if not supplier:
         raise HTTPException(status_code=404, detail="Supplier not found")
@@ -2657,6 +2862,9 @@ async def supplier_ledger(
     
     # Get all purchases (credits - we owe supplier)
     purchase_filters = {"supplier_id": supplier_id, "status": "posted"}
+    company_id = current_user.get('company_id')
+    if company_id:
+        purchase_filters["company_id"] = company_id
     if start_date:
         purchase_filters['order_date'] = {"$gte": start_date}
     if end_date:
@@ -2724,12 +2932,18 @@ async def trial_balance_report(
     current_user: Dict = Depends(get_current_user)
 ):
     """Generate Trial Balance Report showing all account balances"""
+    company_id = current_user.get('company_id')
     
     # Get all accounts
-    accounts = await db.accounts.find({}, {"_id": 0}).sort("code", 1).to_list(1000)
+    accounts_filter = {}
+    if company_id:
+        accounts_filter["company_id"] = company_id
+    accounts = await db.accounts.find(accounts_filter, {"_id": 0}).sort("code", 1).to_list(1000)
     
     # Build date filter for journal entries
     je_filter = {}
+    if company_id:
+        je_filter["company_id"] = company_id
     if as_of_date:
         je_filter["entry_date"] = {"$lte": as_of_date}
     
@@ -2808,7 +3022,8 @@ async def list_payments(
     party_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {"is_active": True}
+    filters = tenant_filter(current_user)
+    filters["is_active"] = True
     if party_type:
         filters['party_type'] = party_type
     if party_id:
@@ -2817,11 +3032,13 @@ async def list_payments(
 
 @api_router.get("/payments/{payment_id}")
 async def get_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("payments", payment_id, current_user)
     return await crud_get("payments", payment_id)
 
 @api_router.post("/payments")
 async def create_payment(data: Dict, current_user: Dict = Depends(get_current_user)):
     payment_id = str(uuid.uuid4())
+    company_id = current_user.get('company_id')
     
     # Generate receipt number
     receipt_type = "RV" if data.get('type') == 'received' else "PV"
@@ -2854,6 +3071,7 @@ async def create_payment(data: Dict, current_user: Dict = Depends(get_current_us
     
     payment = {
         "id": payment_id,
+        "company_id": company_id,
         "receipt_number": receipt_number,
         "type": data.get('type', 'received'),  # received (from customer) or paid (to supplier)
         "party_type": data.get('party_type'),  # customer or supplier
@@ -2886,6 +3104,7 @@ async def create_payment(data: Dict, current_user: Dict = Depends(get_current_us
 
 @api_router.post("/payments/{payment_id}/post")
 async def post_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("payments", payment_id, current_user)
     payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -3108,7 +3327,7 @@ async def post_payment(payment_id: str, current_user: Dict = Depends(get_current
 async def update_payment(payment_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     """Update payment (admin only, must not be posted)"""
     require_admin(current_user)
-    
+    await verify_tenant_access("payments", payment_id, current_user)
     payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -3167,7 +3386,7 @@ async def update_payment(payment_id: str, data: Dict, current_user: Dict = Depen
 async def delete_payment(payment_id: str, current_user: Dict = Depends(get_current_user)):
     """Delete payment and related journal entry (admin only)"""
     require_admin(current_user)
-    
+    await verify_tenant_access("payments", payment_id, current_user)
     payment = await db.payments.find_one({"id": payment_id}, {"_id": 0})
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
@@ -3374,6 +3593,7 @@ async def delete_exchange_gain_loss(entry_id: str, current_user: Dict = Depends(
 # ==================== DOCUMENT CANCELLATION ====================
 @api_router.post("/local-purchases/{po_id}/cancel")
 async def cancel_local_purchase(po_id: str, reason: str = Query(...), current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_purchases", po_id, current_user)
     po = await db.local_purchases.find_one({"id": po_id}, {"_id": 0})
     if not po:
         raise HTTPException(status_code=404, detail="Purchase order not found")
@@ -3440,6 +3660,7 @@ async def cancel_local_purchase(po_id: str, reason: str = Query(...), current_us
 
 @api_router.post("/local-sales/{so_id}/cancel")
 async def cancel_local_sale(so_id: str, reason: str = Query(...), current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("local_sales", so_id, current_user)
     so = await db.local_sales.find_one({"id": so_id}, {"_id": 0})
     if not so:
         raise HTTPException(status_code=404, detail="Sales order not found")
@@ -4232,7 +4453,11 @@ async def delete_journal_entry(entry_id: str, current_user: Dict = Depends(get_c
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
     
-    entry = await db.accounting_journal_entries.find_one({"id": entry_id}, {"_id": 0})
+    company_id = current_user.get('company_id')
+    entry_filter = {"id": entry_id}
+    if company_id:
+        entry_filter["company_id"] = company_id
+    entry = await db.accounting_journal_entries.find_one(entry_filter, {"_id": 0})
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
     
@@ -4371,8 +4596,12 @@ async def create_expense(data: Dict, current_user: Dict = Depends(get_current_us
 async def update_expense(expense_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
     """Update an expense entry (Admin only)"""
     require_admin(current_user)
+    company_id = current_user.get('company_id')
     
-    expense = await db.expense_entries.find_one({"id": expense_id}, {"_id": 0})
+    expense_filter = {"id": expense_id}
+    if company_id:
+        expense_filter["company_id"] = company_id
+    expense = await db.expense_entries.find_one(expense_filter, {"_id": 0})
     if not expense:
         raise HTTPException(status_code=404, detail="Expense entry not found")
     
@@ -4440,7 +4669,11 @@ async def delete_expense(expense_id: str, current_user: Dict = Depends(get_curre
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
     
-    expense = await db.expense_entries.find_one({"id": expense_id}, {"_id": 0})
+    company_id = current_user.get('company_id')
+    expense_filter = {"id": expense_id}
+    if company_id:
+        expense_filter["company_id"] = company_id
+    expense = await db.expense_entries.find_one(expense_filter, {"_id": 0})
     if not expense:
         raise HTTPException(status_code=404, detail="Expense entry not found")
     
@@ -4579,7 +4812,11 @@ async def update_income(income_id: str, data: Dict, current_user: Dict = Depends
     """Update an income entry (Admin only)"""
     require_admin(current_user)
     
-    income = await db.income_entries.find_one({"id": income_id}, {"_id": 0})
+    company_id = current_user.get('company_id')
+    income_filter = {"id": income_id}
+    if company_id:
+        income_filter["company_id"] = company_id
+    income = await db.income_entries.find_one(income_filter, {"_id": 0})
     if not income:
         raise HTTPException(status_code=404, detail="Income entry not found")
     
@@ -4645,7 +4882,11 @@ async def delete_income(income_id: str, current_user: Dict = Depends(get_current
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Only admins can delete entries permanently")
     
-    income = await db.income_entries.find_one({"id": income_id}, {"_id": 0})
+    company_id = current_user.get('company_id')
+    income_filter = {"id": income_id}
+    if company_id:
+        income_filter["company_id"] = company_id
+    income = await db.income_entries.find_one(income_filter, {"_id": 0})
     if not income:
         raise HTTPException(status_code=404, detail="Income entry not found")
     

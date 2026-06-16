@@ -14,6 +14,7 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
+    company_name: '',
     role: 'admin'
   });
   const [showPassword, setShowPassword] = useState(false);
@@ -24,7 +25,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.full_name || !formData.email || !formData.password) {
+    if (!formData.full_name || !formData.email || !formData.password || !formData.company_name) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -45,7 +46,8 @@ export default function RegisterPage() {
         full_name: formData.full_name,
         email: formData.email,
         password: formData.password,
-        role: formData.role
+        role: formData.role,
+        company_name: formData.company_name
       });
       toast.success('Registration successful');
       navigate('/');
@@ -116,6 +118,19 @@ export default function RegisterPage() {
                 placeholder="john@company.ae"
                 className="form-input"
                 data-testid="register-email-input"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="company_name" className="form-label">Company Name</Label>
+              <Input
+                id="company_name"
+                type="text"
+                value={formData.company_name}
+                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                placeholder="Your Company Name"
+                className="form-input"
+                data-testid="register-company-name-input"
               />
             </div>
 
