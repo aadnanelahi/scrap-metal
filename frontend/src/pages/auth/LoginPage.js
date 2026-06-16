@@ -12,6 +12,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState(null);
+  const [resending, setResending] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -23,15 +25,38 @@ export default function LoginPage() {
     }
 
     setLoading(true);
+    setUnverifiedEmail(null);
     try {
       await login(email, password);
       toast.success('Login successful');
       navigate('/');
     } catch (error) {
+      const status = error.response?.status;
       const message = error.response?.data?.detail || 'Login failed';
       toast.error(message);
+      if (status === 403 && message.toLowerCase().includes('verif')) {
+        setUnverifiedEmail(email);
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!unverifiedEmail) return;
+    setResending(true);
+    try {
+      const res = await fetch(`https://scrap-metal-production.up.railway.app/api/auth/resend-verification?email=${encodeURIComponent(unverifiedEmail)}`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Verification email sent! Check your inbox.');
+      } else {
+        toast.error(data.detail || 'Failed to resend.');
+      }
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -134,7 +159,20 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 text-center">
+          <div className="mt-6 space-y-3 text-center">
+            {unverifiedEmail && (
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Didn't receive the email?{' '}
+                <button
+                  type="button"
+                  disabled={resending}
+                  onClick={resendVerification}
+                  className="text-orange-500 hover:text-orange-600 font-medium underline disabled:opacity-50"
+                >
+                  {resending ? 'Sending...' : 'Resend verification email'}
+                </button>
+              </p>
+            )}
             <p className="text-slate-600 dark:text-slate-400">
               Don't have an account?{' '}
               <Link to="/register" className="text-orange-500 hover:text-orange-600 font-medium">
