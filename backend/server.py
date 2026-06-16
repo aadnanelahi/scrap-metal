@@ -17,6 +17,10 @@ from enum import Enum
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 import asyncio
+import smtplib
+import ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env', override=False)
@@ -30,6 +34,35 @@ db = client[os.environ['DB_NAME']]
 JWT_SECRET = os.environ.get('JWT_SECRET', 'scrapos_secret_key_change_in_production')
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24
+
+# SMTP / Email Configuration
+SMTP_HOST = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+SMTP_PORT = int(os.environ.get('SMTP_PORT', '587'))
+SMTP_USER = os.environ.get('SMTP_USER', '')
+SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
+SMTP_FROM = os.environ.get('SMTP_FROM', 'noreply@techsightinnovation.com')
+SUPER_ADMIN_EMAIL = os.environ.get('SUPER_ADMIN_EMAIL', 'aadnan@techsightinnovation.com')
+
+async def send_email(to_emails: List[str], subject: str, html_body: str):
+    """Send an HTML email via SMTP. Runs in thread to avoid blocking."""
+    if not SMTP_USER or not SMTP_PASSWORD:
+        logging.warning("SMTP not configured – skipping email")
+        return
+    def _send():
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = SMTP_FROM
+        msg['To'] = ', '.join(to_emails)
+        msg.attach(MIMEText(html_body, 'html'))
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.starttls(context=ctx)
+            server.login(SMTP_USER, SMTP_PASSWORD)
+            server.sendmail(SMTP_FROM, to_emails, msg.as_string())
+    try:
+        await asyncio.to_thread(_send)
+    except Exception as e:
+        logging.error(f"Failed to send email: {e}")
 
 app = FastAPI(title="ScrapOS ERP API", version="1.0.0")
 api_router = APIRouter(prefix="/api")
@@ -644,6 +677,24 @@ async def register(user_data: CompanyRegistration):
     
     token = create_token(user.id, user.email, user.role, company_id=company.id)
     user_dict = {k: v for k, v in doc.items() if k not in ['_id', 'password_hash']}
+    
+    # Send registration confirmation emails
+    subject = f"Welcome to ScrapOS – {company_name}"
+    body = f"""
+    <h2>Registration Confirmed</h2>
+    <p><strong>Name:</strong> {user.full_name}</p>
+    <p><strong>Email:</strong> {user.email}</p>
+    <p><strong>Company:</strong> {company_name}</p>
+    <p><strong>Role:</strong> {user.role}</p>
+    <p><strong>Registered:</strong> {user.created_at.strftime('%Y-%m-%d %H:%M UTC')}</p>
+    <hr>
+    <p>You can now log in at <a href="https://scrapos.online">scrapos.online</a></p>
+    """
+    await asyncio.gather(
+        send_email([user.email], subject, body),
+        send_email([SUPER_ADMIN_EMAIL], f"[New Registration] {company_name}", body)
+    )
+    
     return Token(access_token=token, user=user_dict)
 
 @api_router.post("/auth/login", response_model=Token)
@@ -718,6 +769,24 @@ async def create_user(user_data: UserCreate, current_user: Dict = Depends(get_cu
     
     await db.users.insert_one(doc)
     await log_audit(current_user['id'], current_user['email'], 'CREATE', 'user', user.id, new_values={"email": user.email})
+    
+    # Notify admin and super admin about new user
+    company = await db.companies.find_one({"id": company_id}, {"_id": 0}) if company_id else None
+    company_name = company.get('name', 'N/A') if company else 'N/A'
+    subject = f"New User Added – {company_name}"
+    body = f"""
+    <h2>New User Created</h2>
+    <p><strong>Name:</strong> {user.full_name}</p>
+    <p><strong>Email:</strong> {user.email}</p>
+    <p><strong>Role:</strong> {user.role}</p>
+    <p><strong>Company:</strong> {company_name}</p>
+    <p><strong>Added by:</strong> {current_user.get('email')}</p>
+    <p><strong>Created:</strong> {user.created_at.strftime('%Y-%m-%d %H:%M UTC')}</p>
+    """
+    notify_emails = [SUPER_ADMIN_EMAIL]
+    if current_user.get('email') and current_user['email'] != SUPER_ADMIN_EMAIL:
+        notify_emails.append(current_user['email'])
+    await send_email(notify_emails, subject, body)
     
     return {k: v for k, v in doc.items() if k not in ['_id', 'password_hash']}
 
