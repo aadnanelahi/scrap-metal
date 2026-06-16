@@ -240,6 +240,7 @@ class ScrapCategoryBase(BaseModel):
     name: str
     code: str
     description: Optional[str] = None
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class ScrapCategory(ScrapCategoryBase):
@@ -257,6 +258,7 @@ class ScrapItemBase(BaseModel):
     unit: str = "MT"
     default_vat_code_id: Optional[str] = None
     min_stock: float = 0
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class ScrapItem(ScrapItemBase):
@@ -270,6 +272,7 @@ class VATCodeBase(BaseModel):
     rate: float
     description: Optional[str] = None
     is_default: bool = False
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class VATCode(VATCodeBase):
@@ -283,6 +286,7 @@ class CurrencyBase(BaseModel):
     symbol: str
     exchange_rate: float = 1.0
     is_base: bool = False
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class Currency(CurrencyBase):
@@ -295,6 +299,7 @@ class PaymentTermBase(BaseModel):
     code: str
     days: int = 0
     description: Optional[str] = None
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class PaymentTerm(PaymentTermBase):
@@ -305,6 +310,7 @@ class IncotermBase(BaseModel):
     name: str
     code: str
     description: Optional[str] = None
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class Incoterm(IncotermBase):
@@ -316,6 +322,7 @@ class PortBase(BaseModel):
     code: str
     country: str
     city: Optional[str] = None
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class Port(PortBase):
@@ -328,6 +335,7 @@ class WeighbridgeBase(BaseModel):
     branch_id: str
     max_capacity: float = 100
     unit: str = "MT"
+    company_id: Optional[str] = None
     is_active: bool = True
 
 class Weighbridge(WeighbridgeBase):
@@ -357,6 +365,7 @@ class WeighbridgeEntry(WeighbridgeEntryBase):
     first_weight_time: Optional[datetime] = None
     second_weight_time: Optional[datetime] = None
     created_by: Optional[str] = None
+    company_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_locked: bool = False
 
@@ -531,6 +540,7 @@ class InventoryStock(BaseModel):
     item_name: str
     branch_id: str
     branch_name: str
+    company_id: Optional[str] = None
     quantity: float = 0
     unit: str = "MT"
     avg_cost: float = 0
@@ -542,6 +552,7 @@ class InventoryMovement(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     item_id: str
     branch_id: str
+    company_id: Optional[str] = None
     movement_type: str  # IN, OUT, ADJUST
     reference_type: str
     reference_id: str
@@ -593,6 +604,7 @@ class AuditLog(BaseModel):
     old_values: Optional[Dict[str, Any]] = None
     new_values: Optional[Dict[str, Any]] = None
     ip_address: Optional[str] = None
+    company_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ==================== HELPER FUNCTIONS ====================
@@ -640,7 +652,7 @@ async def generate_number(prefix: str, collection: str, field: str = "order_numb
     return f"{prefix}-{year_month}-{str(count + 1).zfill(4)}"
 
 async def log_audit(user_id: str, user_email: str, action: str, entity_type: str, entity_id: str, 
-                   old_values: Dict = None, new_values: Dict = None):
+                   old_values: Dict = None, new_values: Dict = None, company_id: str = None):
     audit = AuditLog(
         user_id=user_id,
         user_email=user_email,
@@ -648,7 +660,8 @@ async def log_audit(user_id: str, user_email: str, action: str, entity_type: str
         entity_type=entity_type,
         entity_id=entity_id,
         old_values=old_values,
-        new_values=new_values
+        new_values=new_values,
+        company_id=company_id
     )
     doc = audit.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
@@ -1067,6 +1080,7 @@ async def list_branches(company_id: Optional[str] = None, current_user: Dict = D
 
 @api_router.get("/branches/{branch_id}")
 async def get_branch(branch_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("branches", branch_id, current_user)
     return await crud_get("branches", branch_id)
 
 @api_router.post("/branches")
@@ -1173,132 +1187,210 @@ async def delete_broker(broker_id: str, current_user: Dict = Depends(get_current
 # ==================== SCRAP CATEGORIES ====================
 @api_router.get("/scrap-categories", response_model=List[Dict])
 async def list_scrap_categories(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("scrap_categories")
+    filters = tenant_filter(current_user)
+    return await crud_list("scrap_categories", filters)
+
+@api_router.get("/scrap-categories/{category_id}")
+async def get_scrap_category(category_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("scrap_categories", category_id, current_user)
+    return await crud_get("scrap_categories", category_id)
 
 @api_router.post("/scrap-categories")
 async def create_scrap_category(data: ScrapCategoryBase, current_user: Dict = Depends(get_current_user)):
-    category = ScrapCategory(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    category = ScrapCategory(**data_dict)
     return await crud_create("scrap_categories", category, current_user)
 
 @api_router.put("/scrap-categories/{category_id}")
 async def update_scrap_category(category_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("scrap_categories", category_id, data, current_user)
+    return await tenant_upsert("scrap_categories", category_id, data, current_user)
 
 @api_router.delete("/scrap-categories/{category_id}")
 async def delete_scrap_category(category_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("scrap_categories", category_id, current_user)
+    return await tenant_delete("scrap_categories", category_id, current_user)
 
 # ==================== SCRAP ITEMS ====================
 @api_router.get("/scrap-items", response_model=List[Dict])
 async def list_scrap_items(category_id: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
-    filters = {"category_id": category_id} if category_id else {}
+    filters = tenant_filter(current_user)
+    if category_id:
+        filters['category_id'] = category_id
     return await crud_list("scrap_items", filters)
 
 @api_router.get("/scrap-items/{item_id}")
 async def get_scrap_item(item_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("scrap_items", item_id, current_user)
     return await crud_get("scrap_items", item_id)
 
 @api_router.post("/scrap-items")
 async def create_scrap_item(data: ScrapItemBase, current_user: Dict = Depends(get_current_user)):
-    item = ScrapItem(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    item = ScrapItem(**data_dict)
     return await crud_create("scrap_items", item, current_user)
 
 @api_router.put("/scrap-items/{item_id}")
 async def update_scrap_item(item_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("scrap_items", item_id, data, current_user)
+    return await tenant_upsert("scrap_items", item_id, data, current_user)
 
 @api_router.delete("/scrap-items/{item_id}")
 async def delete_scrap_item(item_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("scrap_items", item_id, current_user)
+    return await tenant_delete("scrap_items", item_id, current_user)
 
 # ==================== VAT CODES ====================
 @api_router.get("/vat-codes", response_model=List[Dict])
 async def list_vat_codes(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("vat_codes")
+    filters = tenant_filter(current_user)
+    return await crud_list("vat_codes", filters)
+
+@api_router.get("/vat-codes/{vat_id}")
+async def get_vat_code(vat_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("vat_codes", vat_id, current_user)
+    return await crud_get("vat_codes", vat_id)
 
 @api_router.post("/vat-codes")
 async def create_vat_code(data: VATCodeBase, current_user: Dict = Depends(get_current_user)):
-    vat = VATCode(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    vat = VATCode(**data_dict)
     return await crud_create("vat_codes", vat, current_user)
 
 @api_router.put("/vat-codes/{vat_id}")
 async def update_vat_code(vat_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("vat_codes", vat_id, data, current_user)
+    return await tenant_upsert("vat_codes", vat_id, data, current_user)
 
 @api_router.delete("/vat-codes/{vat_id}")
 async def delete_vat_code(vat_id: str, current_user: Dict = Depends(get_current_user)):
-    return await crud_delete("vat_codes", vat_id, current_user)
+    return await tenant_delete("vat_codes", vat_id, current_user)
 
 # ==================== CURRENCIES ====================
 @api_router.get("/currencies", response_model=List[Dict])
 async def list_currencies(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("currencies")
+    filters = tenant_filter(current_user)
+    return await crud_list("currencies", filters)
+
+@api_router.get("/currencies/{currency_id}")
+async def get_currency(currency_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("currencies", currency_id, current_user)
+    return await crud_get("currencies", currency_id)
 
 @api_router.post("/currencies")
 async def create_currency(data: CurrencyBase, current_user: Dict = Depends(get_current_user)):
-    currency = Currency(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    currency = Currency(**data_dict)
     return await crud_create("currencies", currency, current_user)
 
 @api_router.put("/currencies/{currency_id}")
 async def update_currency(currency_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("currencies", currency_id, data, current_user)
+    return await tenant_upsert("currencies", currency_id, data, current_user)
 
 # ==================== PAYMENT TERMS ====================
 @api_router.get("/payment-terms", response_model=List[Dict])
 async def list_payment_terms(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("payment_terms")
+    filters = tenant_filter(current_user)
+    return await crud_list("payment_terms", filters)
+
+@api_router.get("/payment-terms/{term_id}")
+async def get_payment_term(term_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("payment_terms", term_id, current_user)
+    return await crud_get("payment_terms", term_id)
 
 @api_router.post("/payment-terms")
 async def create_payment_term(data: PaymentTermBase, current_user: Dict = Depends(get_current_user)):
-    term = PaymentTerm(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    term = PaymentTerm(**data_dict)
     return await crud_create("payment_terms", term, current_user)
 
 @api_router.put("/payment-terms/{term_id}")
 async def update_payment_term(term_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("payment_terms", term_id, data, current_user)
+    return await tenant_upsert("payment_terms", term_id, data, current_user)
 
 # ==================== INCOTERMS ====================
 @api_router.get("/incoterms", response_model=List[Dict])
 async def list_incoterms(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("incoterms")
+    filters = tenant_filter(current_user)
+    return await crud_list("incoterms", filters)
+
+@api_router.get("/incoterms/{incoterm_id}")
+async def get_incoterm(incoterm_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("incoterms", incoterm_id, current_user)
+    return await crud_get("incoterms", incoterm_id)
 
 @api_router.post("/incoterms")
 async def create_incoterm(data: IncotermBase, current_user: Dict = Depends(get_current_user)):
-    incoterm = Incoterm(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    incoterm = Incoterm(**data_dict)
     return await crud_create("incoterms", incoterm, current_user)
 
 @api_router.put("/incoterms/{incoterm_id}")
 async def update_incoterm(incoterm_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("incoterms", incoterm_id, data, current_user)
+    return await tenant_upsert("incoterms", incoterm_id, data, current_user)
 
 # ==================== PORTS ====================
 @api_router.get("/ports", response_model=List[Dict])
 async def list_ports(current_user: Dict = Depends(get_current_user)):
-    return await crud_list("ports")
+    filters = tenant_filter(current_user)
+    return await crud_list("ports", filters)
+
+@api_router.get("/ports/{port_id}")
+async def get_port(port_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("ports", port_id, current_user)
+    return await crud_get("ports", port_id)
 
 @api_router.post("/ports")
 async def create_port(data: PortBase, current_user: Dict = Depends(get_current_user)):
-    port = Port(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    port = Port(**data_dict)
     return await crud_create("ports", port, current_user)
 
 @api_router.put("/ports/{port_id}")
 async def update_port(port_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("ports", port_id, data, current_user)
+    return await tenant_upsert("ports", port_id, data, current_user)
 
 # ==================== WEIGHBRIDGES ====================
 @api_router.get("/weighbridges", response_model=List[Dict])
 async def list_weighbridges(branch_id: Optional[str] = None, current_user: Dict = Depends(get_current_user)):
-    filters = {"branch_id": branch_id} if branch_id else {}
+    filters = tenant_filter(current_user)
+    if branch_id:
+        filters['branch_id'] = branch_id
     return await crud_list("weighbridges", filters)
+
+@api_router.get("/weighbridges/{wb_id}")
+async def get_weighbridge(wb_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("weighbridges", wb_id, current_user)
+    return await crud_get("weighbridges", wb_id)
 
 @api_router.post("/weighbridges")
 async def create_weighbridge(data: WeighbridgeBase, current_user: Dict = Depends(get_current_user)):
-    wb = Weighbridge(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    wb = Weighbridge(**data_dict)
     return await crud_create("weighbridges", wb, current_user)
 
 @api_router.put("/weighbridges/{wb_id}")
 async def update_weighbridge(wb_id: str, data: Dict, current_user: Dict = Depends(get_current_user)):
-    return await crud_update("weighbridges", wb_id, data, current_user)
+    return await tenant_upsert("weighbridges", wb_id, data, current_user)
 
 # ==================== WEIGHBRIDGE ENTRIES ====================
 @api_router.get("/weighbridge-entries", response_model=List[Dict])
@@ -1307,7 +1399,7 @@ async def list_weighbridge_entries(
     branch_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if status:
         filters['status'] = status
     if branch_id:
@@ -1316,11 +1408,16 @@ async def list_weighbridge_entries(
 
 @api_router.get("/weighbridge-entries/{entry_id}")
 async def get_weighbridge_entry(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("weighbridge_entries", entry_id, current_user)
     return await crud_get("weighbridge_entries", entry_id)
 
 @api_router.post("/weighbridge-entries")
 async def create_weighbridge_entry(data: WeighbridgeEntryBase, current_user: Dict = Depends(get_current_user)):
-    entry = WeighbridgeEntry(**data.model_dump())
+    data_dict = data.model_dump()
+    company_id = current_user.get('company_id')
+    if company_id:
+        data_dict['company_id'] = company_id
+    entry = WeighbridgeEntry(**data_dict)
     entry.slip_number = await generate_number("WB", "weighbridge_entries", "slip_number")
     entry.created_by = current_user['id']
     
@@ -1362,6 +1459,7 @@ async def record_second_weight(entry_id: str, tare_weight: float, current_user: 
 
 @api_router.put("/weighbridge-entries/{entry_id}/lock")
 async def lock_weighbridge_entry(entry_id: str, current_user: Dict = Depends(get_current_user)):
+    await verify_tenant_access("weighbridge_entries", entry_id, current_user)
     await db.weighbridge_entries.update_one({"id": entry_id}, {"$set": {"is_locked": True}})
     return {"message": "Entry locked"}
 
@@ -1470,7 +1568,8 @@ async def post_local_purchase(po_id: str, current_user: Dict = Depends(get_curre
             movement_type='IN',
             reference_type='local_purchase',
             reference_id=po_id,
-            reference_number=po['order_number']
+            reference_number=po['order_number'],
+            company_id=po.get('company_id')
         )
     
     # Create journal entry
@@ -1651,9 +1750,10 @@ async def post_intl_purchase(po_id: str, current_user: Dict = Depends(get_curren
             movement_type='IN',
             reference_type='intl_purchase',
             reference_id=po_id,
-            reference_number=po['order_number']
+            reference_number=po['order_number'],
+            company_id=po.get('company_id')
         )
-    
+
     # Create journal entry
     await create_purchase_journal_entry(po, 'intl')
     
@@ -1846,9 +1946,10 @@ async def post_local_sale(so_id: str, current_user: Dict = Depends(get_current_u
             movement_type='OUT',
             reference_type='local_sale',
             reference_id=so_id,
-            reference_number=so['order_number']
+            reference_number=so['order_number'],
+            company_id=so.get('company_id')
         )
-    
+
     # Create journal entry
     await create_sales_journal_entry(so, 'local')
     
@@ -2031,9 +2132,10 @@ async def post_export_sale(contract_id: str, current_user: Dict = Depends(get_cu
             movement_type='OUT',
             reference_type='export_sale',
             reference_id=contract_id,
-            reference_number=contract.get('order_number') or contract.get('contract_number')
+            reference_number=contract.get('order_number') or contract.get('contract_number'),
+            company_id=contract.get('company_id')
         )
-    
+
     # Create journal entry
     await create_sales_journal_entry(contract, 'export')
     
@@ -2115,7 +2217,7 @@ async def delete_export_sale(contract_id: str, current_user: Dict = Depends(get_
 # ==================== INVENTORY FUNCTIONS ====================
 async def update_inventory(item_id: str, item_name: str, branch_id: str, quantity: float, 
                           unit_cost: float, movement_type: str, reference_type: str,
-                          reference_id: str, reference_number: str):
+                          reference_id: str, reference_number: str, company_id: str = None):
     # Get branch name
     branch = await db.branches.find_one({"id": branch_id}, {"_id": 0})
     branch_name = branch.get('name', '') if branch else ''
@@ -2157,6 +2259,7 @@ async def update_inventory(item_id: str, item_name: str, branch_id: str, quantit
             item_name=item_name,
             branch_id=branch_id,
             branch_name=branch_name,
+            company_id=company_id,
             quantity=quantity,
             avg_cost=unit_cost,
             total_value=quantity * unit_cost
@@ -2171,6 +2274,7 @@ async def update_inventory(item_id: str, item_name: str, branch_id: str, quantit
     movement = InventoryMovement(
         item_id=item_id,
         branch_id=branch_id,
+        company_id=company_id,
         movement_type=movement_type,
         reference_type=reference_type,
         reference_id=reference_id,
@@ -2191,7 +2295,7 @@ async def get_inventory_stock(
     branch_id: Optional[str] = None,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if item_id:
         filters['item_id'] = item_id
     if branch_id:
@@ -2205,7 +2309,7 @@ async def get_inventory_movements(
     limit: int = 100,
     current_user: Dict = Depends(get_current_user)
 ):
-    filters = {}
+    filters = tenant_filter(current_user)
     if item_id:
         filters['item_id'] = item_id
     if branch_id:
@@ -2560,7 +2664,7 @@ async def list_audit_logs(
     if current_user['role'] not in ['admin', 'manager']:
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    filters = {}
+    filters = tenant_filter(current_user)
     if entity_type:
         filters['entity_type'] = entity_type
     if user_id:
@@ -3760,7 +3864,8 @@ async def cancel_local_purchase(po_id: str, reason: str = Query(...), current_us
                 movement_type='OUT',
                 reference_type='local_purchase_cancel',
                 reference_id=po_id,
-                reference_number=f"CANCEL-{po['order_number']}"
+                reference_number=f"CANCEL-{po['order_number']}",
+                company_id=po.get('company_id')
             )
         
         # Create reversal journal entry
@@ -3827,7 +3932,8 @@ async def cancel_local_sale(so_id: str, reason: str = Query(...), current_user: 
                 movement_type='IN',
                 reference_type='local_sale_cancel',
                 reference_id=so_id,
-                reference_number=f"CANCEL-{so['order_number']}"
+                reference_number=f"CANCEL-{so['order_number']}",
+                company_id=so.get('company_id')
             )
         
         # Create reversal journal entry
