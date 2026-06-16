@@ -49,7 +49,7 @@ async def send_email(to_emails: List[str], subject: str, html_body: str):
         logging.warning("SMTP not configured – skipping email")
         return
     def _send():
-        msg = MIMultipart('alternative')
+        msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = SMTP_FROM
         msg['To'] = ', '.join(to_emails)
