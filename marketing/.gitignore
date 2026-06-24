@@ -1,0 +1,7 @@
+output/*
+!output/.gitkeep
+*.pyc
+__pycache__/
+.used_posts.json
+fonts/*.ttf
+fonts/*.zip

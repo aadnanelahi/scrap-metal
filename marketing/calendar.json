@@ -1,0 +1,338 @@
+[
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 1,
+      "headline_en": "Digitize Your Weighbridge",
+      "headline_ar": "رقمنة جسر الوزن الخاص بك",
+      "body_en": "Manual weighbridge entry leads to errors and delays. ScrapOS automates weight capture, syncs with purchase/sales orders, and eliminates paperwork. Save 2+ hours per truck turnaround.",
+      "body_ar": "الإدخال اليدوي لجسر الوزن يؤدي إلى أخطاء وتأخير. سكراب أوس يؤتمت تسجيل الأوزان، ويتزامن مع أوامر الشراء والبيع، ويلغي الأعمال الورقية. وفر أكثر من ساعتين لكل شاحنة."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "📦",
+      "feature_name_en": "Real-Time Inventory",
+      "feature_name_ar": "المخزون في الوقت الفعلي",
+      "description_en": "Track every ton of scrap across your yards in real time. ScrapOS automatically updates stock when purchases and sales are posted. Know your exact inventory at any moment.",
+      "description_ar": "تتبع كل طن من الخردة في ساحاتك في الوقت الفعلي. سكراب أوس يحدث المخزون تلقائياً عند تسجيل المشتريات والمبيعات. اعرف مخزونك الدقيق في أي لحظة."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "8%",
+      "stat_label_en": "UAE Scrap Market Growth Q2",
+      "stat_label_ar": "نمو سوق الخردة الإماراتي الربع الثاني",
+      "context_en": "The UAE scrap metal market continues to expand driven by construction and infrastructure mega-projects. Companies using digital ERP systems report 30% faster operations.",
+      "context_ar": "سوق الخردة المعدنية الإماراتي يواصل التوسع بفضل مشاريع البناء والبنية التحتية العملاقة. الشركات التي تستخدم أنظمة ERP الرقمية تبلغ عن عمليات أسرع بنسبة 30٪."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "We reduced paperwork by 90% and cut weighing time from 15 to 3 minutes per truck.",
+      "quote_ar": "قللنا الأعمال الورقية بنسبة 90٪ واختصارنا وقت الوزن من 15 إلى 3 دقائق لكل شاحنة.",
+      "author_en": "Operations Manager",
+      "author_ar": "مدير العمليات",
+      "role_en": "Dubai Scrap Trading Co.",
+      "role_ar": "شركة دبي لتجارة الخردة"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v2.5",
+      "headline_en": "Export Sales Module",
+      "headline_ar": "وحدة مبيعات التصدير",
+      "features_en": "• Letter of Credit tracking\n• Incoterms 2025 support\n• Multi-currency invoicing\n• Automated brokerage commission",
+      "features_ar": "• تتبع خطابات الاعتماد\n• دعم شروط التجارة الدولية 2025\n• الفوترة متعددة العملات\n• عمولة السمسرة الآلية"
+    }
+  },
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 2,
+      "headline_en": "VAT Compliance Made Easy",
+      "headline_ar": "الامتثال لضريبة القيمة المضافة بسهولة",
+      "body_en": "UAE VAT regulations require accurate tax calculations on every transaction. ScrapOS automatically applies the correct VAT rate per item, generates tax invoices, and produces VAT reports for FTA submission.",
+      "body_ar": "لوائح ضريبة القيمة المضافة الإماراتية تتطلب حسابات ضريبية دقيقة لكل معاملة. سكراب أوس يطبق تلقائياً نسبة الضريبة الصحيحة لكل صنف، ويولد فواتير ضريبية، وينتج تقارير ضريبة القيمة المضافة لتقديمها للهيئة الاتحادية للضرائب."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "💰",
+      "feature_name_en": "Broker Commission Automation",
+      "feature_name_ar": "أتمتة عمولة السمسرة",
+      "description_en": "Stop calculating broker commissions manually. ScrapOS auto-calculates commissions based on per-ton or percentage rates, tracks payments, and generates commission statements for each broker.",
+      "description_ar": "توقف عن حساب عمولات السمسرة يدوياً. سكراب أوس يحسب العمولات تلقائياً بناءً على السعر للطن أو النسبة المئوية، ويتتبع المدفوعات، ويولد كشوف العمولات لكل وسيط."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "60%",
+      "stat_label_en": "Faster Month-End Closing",
+      "stat_label_ar": "إغلاق نهاية الشهر أسرع",
+      "context_en": "Scrap metal traders using ERP systems close their books 60% faster than those using spreadsheets. Automated journal entries, real-time P&L, and instant balance sheets reduce month-end stress.",
+      "context_ar": "تجار الخردة الذين يستخدمون أنظمة ERP يغلقون حساباتهم أسرع بنسبة 60٪ من أولئك الذين يستخدمون جداول البيانات. قيود اليومية الآلية والأرباح والخسائر في الوقت الفعلي تقلل ضغط نهاية الشهر."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "The accounting module alone saved us an entire day of work each week.",
+      "quote_ar": "وحدة المحاسبة وحدها وفرت لنا يوماً كاملاً من العمل كل أسبوع.",
+      "author_en": "Finance Manager",
+      "author_ar": "مدير المالية",
+      "role_en": "Abu Dhabi Metals Trading",
+      "role_ar": "شركة أبوظبي لتجارة المعادن"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v2.6",
+      "headline_en": "Bilingual Invoicing",
+      "headline_ar": "الفوترة ثنائية اللغة",
+      "features_en": "• Arabic-English invoices\n• Support local & export formats\n• Customizable invoice templates\n• Direct print from weighbridge",
+      "features_ar": "• فواتير بالعربية والإنجليزية\n• دعم التنسيقات المحلية والتصدير\n• قوالب فواتير قابلة للتخصيص\n• طباعة مباشرة من جسر الوزن"
+    }
+  },
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 3,
+      "headline_en": "Multi-Currency Without Headaches",
+      "headline_ar": "العملات المتعددة بدون صداع",
+      "body_en": "Trading internationally means dealing in USD, EUR, and more. ScrapOS handles multi-currency purchases and sales, auto-calculates exchange gains/losses, and keeps your books in AED.",
+      "body_ar": "التداول دولياً يعني التعامل بالدولار واليورو وأكثر. سكراب أوس يتعامل مع المشتريات والمبيعات متعددة العملات، ويحسب أرباح/خسائر الصرف تلقائياً، ويحتفظ بدفاترك بالدرهم الإماراتي."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "👥",
+      "feature_name_en": "Role-Based Access Control",
+      "feature_name_ar": "التحكم في الوصول حسب الدور",
+      "description_en": "Not everyone needs access to financial data. ScrapOS provides role-based permissions: admin, manager, accountant, weighbridge operator. Control who sees what with granular access rights.",
+      "description_ar": "ليس الجميع بحاجة للوصول إلى البيانات المالية. سكراب أوس يوفر أذونات حسب الدور: مدير، محاسب، مشغل جسر وزن. تحكم في من يرى ماذا مع حقوق وصول مفصلة."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "15K+",
+      "stat_label_en": "Trucks Weighed Monthly",
+      "stat_label_ar": "شاحنة يتم وزنها شهرياً",
+      "context_en": "The average medium-sized scrap yard in the UAE processes over 15,000 truck weighments per month. ScrapOS handles this volume with sub-second response times and zero downtime.",
+      "context_ar": "ساحة الخردة المتوسطة في الإمارات تعالج أكثر من 15,000 عملية وزن شاحنة شهرياً. سكراب أوس يتعامل مع هذا الحجم بزمن استجابة أقل من ثانية وبدون توقف."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "Switching to ScrapOS from spreadsheets was the best decision we made this year.",
+      "quote_ar": "التحول إلى سكراب أوس من جداول البيانات كان أفضل قرار اتخذناه هذا العام.",
+      "author_en": "CEO",
+      "author_ar": "الرئيس التنفيذي",
+      "role_en": "Sharjah Scrap Recycling",
+      "role_ar": "شركة الشارقة لتدوير الخردة"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v2.7",
+      "headline_en": "Audit Trail & Logs",
+      "headline_ar": "سجل التدقيق والسجلات",
+      "features_en": "• Every action is logged\n• User activity tracking\n• Before/after change history\n• Exportable audit reports",
+      "features_ar": "• كل إجراء يتم تسجيله\n• تتبع نشاط المستخدم\n• سجل التغييرات قبل/بعد\n• تقارير تدقيق قابلة للتصدير"
+    }
+  },
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 4,
+      "headline_en": "Automate Journal Entries",
+      "headline_ar": "أتمتة قيود اليومية",
+      "body_en": "Manual journal entries are error-prone and time-consuming. ScrapOS auto-creates journal entries for every purchase, sale, and payment. Your books are always up-to-date without manual data entry.",
+      "body_ar": "قيود اليومية اليدوية عرضة للأخطاء وتستغرق وقتاً طويلاً. سكراب أوس ينشئ تلقائياً قيود اليومية لكل عملية شراء وبيع ودفع. دفاترك دائماً محدثة بدون إدخال بيانات يدوي."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "📊",
+      "feature_name_en": "Real-Time Profit & Loss",
+      "feature_name_ar": "الأرباح والخسائر في الوقت الفعلي",
+      "description_en": "Stop waiting for month-end to see your profitability. ScrapOS provides real-time P&L statements, gross margin per deal, and trend analysis. Make informed decisions instantly.",
+      "description_ar": "توقف عن انتظار نهاية الشهر لترى أرباحك. سكراب أوس يوفر بيانات الأرباح والخسائر في الوقت الفعلي، هامش الربح الإجمالي لكل صفقة، وتحليل الاتجاهات. اتخذ قرارات مستنيرة فوراً."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "94%",
+      "stat_label_en": "Data Entry Error Reduction",
+      "stat_label_ar": "تقليل أخطاء إدخال البيانات",
+      "context_en": "Companies that digitize their scrap operations report up to 94% reduction in data entry errors. Automated weighing and barcode scanning eliminate manual transcription mistakes.",
+      "context_ar": "الشركات التي ترقمن عمليات الخردة تبلغ عن تقليل أخطاء إدخال البيانات بنسبة تصل إلى 94٪. الوزن الآلي ومسح الباركود يلغي أخطاء النسخ اليدوي."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "Setup was quick and the support team understood our specific scrap trading needs.",
+      "quote_ar": "كان الإعداد سريعاً وفريق الدعم فهم احتياجاتنا الخاصة بتجارة الخردة.",
+      "author_en": "IT Director",
+      "author_ar": "مدير تقنية المعلومات",
+      "role_en": "Ras Al Khaimah Steel",
+      "role_ar": "شركة رأس الخيمة للصلب"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v2.8",
+      "headline_en": "Weighbridge Kiosk Mode",
+      "headline_ar": "وضع كشك جسر الوزن",
+      "features_en": "• Full-screen kiosk interface\n• High-contrast weight display\n• Barcode/QR scanning\n• Auto-print weighbridge tickets",
+      "features_ar": "• واجهة كشك ملء الشاشة\n• عرض الوزن عالي التباين\n• مسح الباركود/رمز الاستجابة السريعة\n• طباعة تذاكر جسر الوزن تلقائياً"
+    }
+  },
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 5,
+      "headline_en": "Track Inventory by Grade",
+      "headline_ar": "تتبع المخزون حسب الدرجة",
+      "body_en": "Not all scrap is the same. ScrapOS lets you categorize inventory by grade, type, and quality. Track average cost per grade and identify your most profitable scrap categories.",
+      "body_ar": "ليست كل الخردة متشابهة. سكراب أوس يتيح لك تصنيف المخزون حسب الدرجة والنوع والجودة. تتبع متوسط التكلفة لكل درجة وحدد فئات الخردة الأكثر ربحية."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "📋",
+      "feature_name_en": "Customizable Reports",
+      "feature_name_ar": "تقارير قابلة للتخصيص",
+      "description_en": "Generate purchase and sales registers, VAT reports, stock aging analysis, and broker commission statements. Filter by date range, supplier, customer, or item. Export to PDF or Excel.",
+      "description_ar": "قم بإنشاء سجلات المشتريات والمبيعات، تقارير ضريبة القيمة المضافة، تحليل عمر المخزون، وكشوف عمولات السمسرة. تصفية حسب النطاق الزمني أو المورد أو العميل أو الصنف. تصدير إلى PDF أو Excel."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "3X",
+      "stat_label_en": "Faster Truck Turnaround",
+      "stat_label_ar": "دوران الشاحنات أسرع",
+      "context_en": "Digital weighbridge systems reduce truck turnaround time by up to 3x compared to manual processes. Faster turnaround means more throughput and higher customer satisfaction.",
+      "context_ar": "أنظمة جسر الوزن الرقمية تقلل وقت دوران الشاحنات بمقدار 3 أضعاف مقارنة بالعمليات اليدوية. دوران أسرع يعني إنتاجية أعلى ورضا عملاء أكبر."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "The inventory accuracy improved dramatically. We now know exactly what we have and where.",
+      "quote_ar": "تحسنت دقة المخزون بشكل كبير. نحن الآن نعرف بالضبط ما لدينا وأين هو.",
+      "author_en": "Yard Manager",
+      "author_ar": "مدير الساحة",
+      "role_en": "Northern Emirates Scrap",
+      "role_ar": "خردة الإمارات الشمالية"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v2.9",
+      "headline_en": "Mobile App Preview",
+      "headline_ar": "معاينة التطبيق المحمول",
+      "features_en": "• Track operations from phone\n• Approve purchases on-the-go\n• Real-time notifications\n• Mobile weighbridge view",
+      "features_ar": "• تتبع العمليات من الهاتف\n• الموافقة على المشتريات أثناء التنقل\n• إشعارات في الوقت الفعلي\n• عرض جسر الوزن المحمول"
+    }
+  },
+  {
+    "template": "tip",
+    "day_of_week": "Monday",
+    "params": {
+      "tip_number": 6,
+      "headline_en": "Streamline Supplier Payments",
+      "headline_ar": "تبسيط مدفوعات الموردين",
+      "body_en": "Managing payments to multiple suppliers can be chaotic. ScrapOS tracks payables, auto-calculates due dates, and generates payment vouchers. Never miss a payment deadline again.",
+      "body_ar": "إدارة المدفوعات لموردين متعددين يمكن أن تكون فوضوية. سكراب أوس يتتبع الذمم الدائنة، ويحسب تواريخ الاستحقاق تلقائياً، وينشئ قسائم الدفع. لا تفوت موعد دفع مرة أخرى."
+    }
+  },
+  {
+    "template": "feature",
+    "day_of_week": "Tuesday",
+    "params": {
+      "icon_emoji": "🛡️",
+      "feature_name_en": "Data Security & Backup",
+      "feature_name_ar": "أمان البيانات والنسخ الاحتياطي",
+      "description_en": "Your business data is automatically backed up and secured. ScrapOS uses encrypted cloud storage with daily backups, role-based access, and full audit trails. Your data is safe.",
+      "description_ar": "بيانات عملك يتم نسخها احتياطياً وتأمينها تلقائياً. سكراب أوس يستخدم تخزين سحابي مشفر مع نسخ احتياطي يومي، وصول حسب الدور، وسجلات تدقيق كاملة. بياناتك آمنة."
+    }
+  },
+  {
+    "template": "insight",
+    "day_of_week": "Wednesday",
+    "params": {
+      "stat": "30K+",
+      "stat_label_en": "Active Users on ScrapOS",
+      "stat_label_ar": "مستخدم نشط على سكراب أوس",
+      "context_en": "ScrapOS powers operations for scrap traders and recycling facilities across the UAE. Join the growing community of professionals who trust ScrapOS for their daily operations.",
+      "context_ar": "سكراب أوس يدعم عمليات تجار الخردة ومرافق إعادة التدوير في جميع أنحاء الإمارات. انضم إلى المجتمع المتنامي من المحترفين الذين يثقون في سكراب أوس لعملياتهم اليومية."
+    }
+  },
+  {
+    "template": "testimonial",
+    "day_of_week": "Thursday",
+    "params": {
+      "quote_en": "The multi-company feature lets us manage all our yards from one dashboard. Game changer.",
+      "quote_ar": "ميزة الشركات المتعددة تتيح لنا إدارة جميع ساحاتنا من لوحة تحكم واحدة. تغيير جذري.",
+      "author_en": "Group Operations Head",
+      "author_ar": "رئيس العمليات المجمعة",
+      "role_en": "UAE Scrap Holdings Group",
+      "role_ar": "مجموعة القابضة للخردة الإماراتية"
+    }
+  },
+  {
+    "template": "update",
+    "day_of_week": "Friday",
+    "params": {
+      "version": "v3.0",
+      "headline_en": "API & Integrations",
+      "headline_ar": "واجهة برمجة التطبيقات والتكاملات",
+      "features_en": "• RESTful API for custom integrations\n• Webhook support\n• Excel/CSV import/export\n• Bank feed integration",
+      "features_ar": "• API RESTful للتكاملات المخصصة\n• دعم Webhook\n• استيراد/تصدير Excel/CSV\n• تكامل التغذية البنكية"
+    }
+  }
+]
