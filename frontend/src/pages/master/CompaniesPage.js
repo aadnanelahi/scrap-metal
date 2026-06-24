@@ -9,7 +9,7 @@ import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Edit2, Trash2, Building2, Loader2, Upload, X } from 'lucide-react';
+import { Edit2, Trash2, Building2, Loader2, Upload, X } from 'lucide-react';
 
 export default function CompaniesPage() {
   const navigate = useNavigate();
@@ -134,9 +134,6 @@ export default function CompaniesPage() {
           <p className="text-slate-600 dark:text-slate-400 mt-1">Manage company entities</p>
         </div>
         <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="btn-accent gap-2" data-testid="new-company-btn"><Plus className="w-4 h-4" />New Company</Button>
-          </DialogTrigger>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle className="font-manrope">{editing ? 'Edit' : 'New'} Company</DialogTitle></DialogHeader>
             <div className="space-y-4 mt-4">

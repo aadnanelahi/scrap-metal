@@ -142,7 +142,7 @@ const navItems = [
     title: 'Data Management',
     icon: HardDrive,
     path: '/data-management',
-    adminOnly: true,
+    superAdminOnly: true,
   },
 ];
 
@@ -178,11 +178,15 @@ export const Layout = ({ children }) => {
     if (item.adminOnly && user?.role !== 'admin') {
       return null;
     }
+    // Hide super-admin-only items for company admins
+    if (item.superAdminOnly && user?.company_id) {
+      return null;
+    }
 
     if (hasChildren) {
       // Filter out admin-only children for non-admin users
       const visibleChildren = item.children.filter(
-        child => !child.adminOnly || user?.role === 'admin'
+        child => !(child.adminOnly && user?.role !== 'admin') && !(child.superAdminOnly && user?.company_id)
       );
       
       // If no visible children, don't show the parent
